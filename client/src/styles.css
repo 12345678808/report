@@ -1,7 +1,7 @@
 :root{
   --navy:#0B2A3F; --steel:#245C82; --gold:#C9A24B; --sky:#F2F6FA; --sky-line:#DCE6EF;
   --ink:#1E2A33; --ink-soft:#6C7A85; --red:#E5484D; --green:#2FAE60; --yellow:#E8B93A;
-  --paper:#F7F9FB;
+  --paper:#F7F9FB; --gold-light:#FBF3E1; --gold-line:#EBD9AE;
 }
 *{ font-family: Arial, Helvetica, sans-serif; }
 body{ background: var(--paper); color: var(--ink); }
@@ -22,6 +22,38 @@ body{ background: var(--paper); color: var(--ink); }
 .login-btn{ width:100%;margin-top:18px;padding:12px;border:none;border-radius:8px;background:linear-gradient(180deg,var(--steel),var(--navy));color:#fff;font-weight:bold;font-size:14px;cursor:pointer; }
 .login-btn:disabled{ opacity:0.6;cursor:default; }
 .login-note{ margin-top:16px;font-size:11px;color:var(--ink-soft); }
+
+/* ---------- login screen entrance animation ----------
+   Ported from one.html: the card rises + settles, the seal pops in with a
+   little spin, then title/sub/toggle/fields/button/note stagger in one after
+   another. Fully disabled under prefers-reduced-motion. */
+@keyframes loginCardIn{
+  from{ opacity:0; transform:translateY(22px) scale(.97); }
+  to{ opacity:1; transform:translateY(0) scale(1); }
+}
+@keyframes loginSealIn{
+  0%{ opacity:0; transform:scale(.35) rotate(-18deg); }
+  55%{ opacity:1; transform:scale(1.08) rotate(5deg); }
+  100%{ opacity:1; transform:scale(1) rotate(0deg); }
+}
+@keyframes loginFadeUp{
+  from{ opacity:0; transform:translateY(10px); }
+  to{ opacity:1; transform:translateY(0); }
+}
+.login-card{ animation:loginCardIn .6s cubic-bezier(.16,.84,.4,1) both; }
+.login-card .seal{ animation:loginSealIn .7s cubic-bezier(.24,.9,.32,1.2) .14s both; }
+.login-title{ animation:loginFadeUp .45s ease .3s both; }
+.login-sub{ animation:loginFadeUp .45s ease .36s both; }
+.role-toggle{ animation:loginFadeUp .45s ease .44s both; }
+.login-card form label:nth-of-type(1){ animation:loginFadeUp .45s ease .5s both; }
+.login-card form input:nth-of-type(1){ animation:loginFadeUp .45s ease .56s both; }
+.login-card form label:nth-of-type(2){ animation:loginFadeUp .45s ease .62s both; }
+.login-card form input:nth-of-type(2){ animation:loginFadeUp .45s ease .68s both; }
+.login-btn{ animation:loginFadeUp .45s ease .76s both; }
+.login-note{ animation:loginFadeUp .45s ease .86s both; }
+@media (prefers-reduced-motion: reduce){
+  .login-card, .login-card *{ animation:none !important; }
+}
 
 .dashboard{ min-height:100vh; }
 .navbar{ display:flex;align-items:center;justify-content:space-between;background:#fff;border-bottom:1px solid var(--sky-line);padding:12px 22px; }
@@ -54,8 +86,167 @@ table.kpi-table{ width:100%;border-collapse:separate;border-spacing:0;font-size:
 .mini-btn{ padding:5px 10px;margin:0 2px;border:1px solid var(--sky-line);border-radius:6px;background:#fff;font-size:11.5px;font-weight:bold;color:var(--steel);cursor:pointer; }
 .mini-btn.save{ background:var(--navy);color:#fff;border-color:var(--navy); }
 
+/* ---------- View Analytics button + modal ---------- */
+.analytics-btn{ display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border:1px solid var(--steel);background:#fff;color:var(--steel);font-size:10.5px;font-weight:bold;border-radius:14px;cursor:pointer;white-space:nowrap; }
+.analytics-btn:hover{ background:var(--sky); }
+.analytics-btn svg{ width:11px;height:11px; }
+
+.modal-overlay{ position:fixed;inset:0;background:rgba(11,29,48,0.55);display:flex;align-items:center;justify-content:center;z-index:200;padding:16px; }
+.modal-card{ background:#fff;border-radius:14px;width:100%;max-width:560px;max-height:88vh;overflow-y:auto;padding:0 24px 24px;box-shadow:0 20px 50px rgba(11,29,48,0.35); }
+.modal-accent{ height:6px;border-radius:14px 14px 0 0;margin:0 -24px 20px;background:var(--sky-line); }
+.modal-zone-block{ background:var(--sky);border:1px solid var(--sky-line);border-radius:10px;padding:11px 14px;margin:2px 0 16px; }
+.modal-zone-label{ font-size:9.5px;text-transform:uppercase;letter-spacing:0.4px;color:var(--ink-soft);margin-bottom:7px; }
+.modal-zone-row{ display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px; }
+.modal-zone-name{ font-size:12.5px;font-weight:bold;color:var(--navy); }
+.modal-zone-pct{ font-size:18px;font-weight:bold;color:var(--navy);font-variant-numeric:tabular-nums; }
+.modal-zone-bar-track{ width:100%;height:5px;border-radius:5px;background:var(--sky-line);overflow:hidden; }
+.modal-zone-bar-fill{ height:100%;border-radius:5px;transition:width 0.2s; }
+.modal-head{ display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:4px; }
+.modal-title{ font-family:Georgia,serif;font-size:16px;color:var(--navy);font-weight:bold;line-height:1.35; }
+.modal-dept{ font-size:10.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--steel);font-weight:bold;margin:2px 0 10px; }
+.modal-close{ border:none;background:var(--sky);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:15px;color:var(--ink-soft);flex:0 0 auto; }
+.modal-close:hover{ background:var(--sky-line); }
+.modal-stats{ display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 16px; }
+.modal-stat{ flex:1;min-width:100px;background:var(--sky);border:1px solid var(--sky-line);border-radius:10px;padding:9px 12px; }
+.modal-stat-label{ font-size:9.5px;text-transform:uppercase;letter-spacing:0.4px;color:var(--ink-soft); }
+.modal-stat-value{ font-size:16px;font-weight:bold;color:var(--navy);margin-top:2px; }
+.modal-status-pill{ display:inline-flex;align-items:center;gap:5px;padding:4px 11px;border-radius:14px;font-size:11px;font-weight:bold;color:#fff;margin-top:14px; }
+.modal-chart-wrap{ margin-top:6px;background:var(--sky);border:1px solid var(--sky-line);border-radius:12px;padding:10px 8px 2px; }
+.modal-period-block{ display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin:2px 0 14px;padding:10px 12px;background:var(--sky);border:1px solid var(--sky-line);border-radius:10px; }
+.modal-period-toggle{ display:flex;gap:6px; }
+.modal-period-toggle button{ padding:5px 12px;border:1px solid var(--sky-line);background:#fff;color:var(--steel);font-size:11px;font-weight:bold;border-radius:16px;cursor:pointer;transition:background 0.15s,color 0.15s; }
+.modal-period-toggle button:hover{ background:var(--gold-light); }
+.modal-period-toggle button.active{ background:linear-gradient(180deg,var(--steel),var(--navy));border-color:var(--navy);color:#fff; }
+.modal-period-display{ font-family:Georgia,'Times New Roman',serif;font-size:14px;font-weight:bold;color:var(--navy);background:#fff;border:1px solid var(--gold-line);border-radius:8px;padding:5px 12px; }
+.modal-period-dates{ display:flex;align-items:center;gap:6px;flex-wrap:wrap; }
+.modal-period-dates label{ font-size:10px;text-transform:uppercase;letter-spacing:0.3px;color:var(--ink-soft); }
+.modal-period-dates input[type="date"]{ padding:5px 7px;border:1px solid var(--sky-line);border-radius:6px;font-size:11.5px;background:#fff;color:var(--ink); }
+.modal-period-dates .to-sep{ font-size:11px;color:var(--ink-soft);font-weight:bold; }
+.modal-period-note{ width:100%;font-size:10.5px;color:var(--ink-soft);margin:2px 0 0; }
+.modal-legend{ display:flex;gap:16px;margin-top:8px;font-size:10.5px;color:var(--ink-soft);flex-wrap:wrap; }
+.modal-legend span{ display:inline-flex;align-items:center;gap:5px; }
+.modal-legend i{ width:10px;height:10px;border-radius:2px;display:inline-block; }
+.modal-note{ margin-top:14px;padding-top:12px;border-top:1px dashed var(--sky-line);font-size:11px;color:var(--ink-soft);font-style:italic;line-height:1.5; }
+
+@media (max-width: 640px){
+  .modal-card{ max-width:94vw;padding:0 14px 18px; }
+  .modal-stat{ min-width:44%; }
+  .modal-chart-wrap svg text{ font-size:9px; }
+}
+
+/* ---------- PDF export letterhead (hidden on screen, shown only while
+   capturing the sheet-wrap for a PDF download — see .force-letterhead below) ---------- */
+.print-letterhead-wrap{ display:none; }
+body.force-letterhead .print-letterhead-wrap{ display:block; }
+.smart-city-badge{ display:flex;flex-direction:column;align-items:center;gap:6px;margin-bottom:8px; }
+.smart-city-badge svg{ display:block; }
+.sc-label{ font-size:10px;font-weight:bold;letter-spacing:1.5px;color:var(--navy); }
+.org-name-main{ text-align:center;font-size:20px;font-weight:bold;color:var(--navy);margin-bottom:14px; }
+.report-badge-row{ display:flex;gap:8px;justify-content:center;margin-bottom:6px; }
+.report-badge{ font-size:11px;font-weight:bold;letter-spacing:0.3px;padding:4px 12px;border-radius:20px;display:inline-block; }
+.report-badge.kpi{ background:var(--gold-light);color:#9C7A28;border:1px solid var(--gold-line); }
+.report-badge.overall{ background:var(--sky);color:var(--steel);border:1px solid var(--sky-line); }
+.report-timestamp{ text-align:center;font-size:11px;color:var(--ink-soft);margin-bottom:16px; }
+
+/* ---------- control bar (view tabs + PDF export button) ---------- */
+.control-bar{ display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap; }
+.control-bar .view-tabs{ margin-bottom:0; }
+.pdf-btn{ padding:9px 16px;border:1px solid var(--navy);background:#fff;color:var(--navy);font-weight:bold;font-size:12.5px;border-radius:8px;cursor:pointer;white-space:nowrap;transition:background 0.15s,color 0.15s; }
+.pdf-btn:hover{ background:var(--navy);color:#fff; }
+.pdf-btn:disabled{ opacity:0.6;cursor:default; }
+
+/* ---------- force-letterhead: applied to <body> only while html2pdf is
+   capturing .sheet-wrap. Hides on-screen-only controls that aren't
+   clickable in a PDF and swaps in the letterhead above (via .print-letterhead-wrap). ---------- */
+body.force-letterhead .control-bar,
+body.force-letterhead .zone-chips,
+body.force-letterhead .edit-col,
+body.force-letterhead .analytics-col,
+body.force-letterhead .analytics-cell{ display:none !important; }
+body.force-letterhead .sheet-wrap{ box-shadow:none; }
+body.force-letterhead table.kpi-table{ table-layout:fixed;font-size:12px; }
+body.force-letterhead .kpi-table thead th{ word-break:break-word;overflow-wrap:break-word;white-space:normal;font-size:10.5px;padding:8px 6px; }
+body.force-letterhead .kpi-table tbody td{ padding:6px 6px;font-size:11.5px; }
+body.force-letterhead .kpi-table tbody tr{ page-break-inside:avoid; }
+body.force-letterhead .kpi-table td.dept{ word-break:break-word;overflow-wrap:break-word;white-space:normal;font-size:11px;line-height:1.3; }
+body.force-letterhead .za-cards{ grid-template-columns:repeat(5, minmax(0, 1fr));gap:8px; }
+body.force-letterhead .za-card{ padding:10px 8px 9px;min-width:0;overflow:hidden; }
+body.force-letterhead .za-zone-name{ font-size:9px;letter-spacing:0.2px; }
+body.force-letterhead .za-pct{ font-size:19px; }
+body.force-letterhead .za-pct-label{ font-size:8px;margin:1px 0 7px; }
+body.force-letterhead .za-metrics{ font-size:9px; }
+body.force-letterhead .za-tier-label{ font-size:8px; }
+body.force-letterhead .za-metric-row{ flex-wrap:wrap;row-gap:1px; }
+body.force-letterhead .za-metric-row span,
+body.force-letterhead .za-metric-row b{ white-space:normal;word-break:break-word;min-width:0; }
+body.force-letterhead .zone-analyzer{ box-shadow:none; }
+
+/* ---------- view tabs (Overall report / Zone report) ---------- */
+.view-tabs{ display:flex;gap:8px;margin-bottom:18px; }
+.view-tabs button{ padding:9px 18px;border:1px solid var(--sky-line);background:#fff;color:var(--steel);font-size:12.5px;font-weight:bold;letter-spacing:0.3px;border-radius:20px;cursor:pointer;transition:background 0.15s,color 0.15s; }
+.view-tabs button:hover{ background:var(--gold-light); }
+.view-tabs button.active{ background:linear-gradient(180deg,var(--steel),var(--navy));border-color:var(--navy);color:#fff; }
+
+/* ---------- Live Zone Analyzer ---------- */
+.zone-analyzer{ background:linear-gradient(160deg,#F9FBFD 0%,#EEF3F8 100%);border:1px solid var(--sky-line);border-radius:16px;padding:22px 24px 24px;margin:0 0 22px;box-shadow:0 6px 18px rgba(18,42,67,0.08); }
+.za-head{ display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:18px; }
+.za-head-left{ display:flex;align-items:flex-start;gap:12px; }
+.za-icon{ width:38px;height:38px;border-radius:10px;background:rgba(200,155,60,0.14);border:1px solid rgba(200,155,60,0.4);display:flex;align-items:center;justify-content:center;flex:0 0 auto; }
+.za-icon svg{ width:20px;height:20px;stroke:#9C7A28; }
+.za-badge-pill{ display:inline-block;font-size:10px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:#9C7A28;background:rgba(200,155,60,0.14);border:1px solid rgba(200,155,60,0.35);border-radius:20px;padding:3px 10px;margin-bottom:6px; }
+.za-title{ font-family:Georgia,'Times New Roman',serif;font-size:19px;font-weight:bold;color:var(--navy);margin:0 0 3px; }
+.za-subtitle{ font-size:11.5px;color:var(--ink-soft);margin:0; }
+.za-asof{ font-size:10.5px;color:var(--ink-soft);background:rgba(11,29,48,0.04);border:1px solid rgba(11,29,48,0.10);border-radius:8px;padding:6px 12px;white-space:nowrap; }
+.za-cards{ display:grid;grid-template-columns:repeat(5, minmax(0, 1fr));gap:14px; }
+.za-card{ position:relative;background:linear-gradient(180deg, var(--za-tint, #ffffff) 0%, #ffffff 60%);border:1px solid var(--sky-line);border-top:3px solid var(--za-tier, var(--sky-line));border-radius:12px;padding:16px 16px 14px;box-shadow:0 2px 10px rgba(18,42,67,0.06); }
+.za-card-top{ display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px; }
+.za-zone-name{ font-size:11px;font-weight:bold;letter-spacing:0.6px;text-transform:uppercase;color:var(--steel); }
+.za-tier{ display:flex;align-items:center;gap:4px;flex:0 0 auto;background:var(--za-tier, var(--sky));padding:2.5px 8px 2.5px 7px;border-radius:20px; }
+.za-dot{ width:6px;height:6px;border-radius:50%;flex:0 0 auto;background:#fff; }
+.za-tier-label{ font-size:9.5px;font-weight:bold;letter-spacing:0.3px;white-space:nowrap;color:#fff; }
+.za-pct{ font-family:Georgia,'Times New Roman',serif;font-size:27px;font-weight:bold;color:var(--za-tier, var(--navy));line-height:1.1; }
+.za-pct-label{ font-size:10px;font-weight:bold;letter-spacing:0.8px;text-transform:uppercase;color:var(--ink-soft);margin:1px 0 10px; }
+.za-bar-track{ width:100%;height:6px;border-radius:6px;background:var(--sky);overflow:hidden;margin-bottom:13px; }
+.za-bar-fill{ height:100%;border-radius:6px; }
+.za-metrics{ font-size:11.5px;border-top:1px solid var(--sky-line);padding-top:9px; }
+.za-metric-row{ display:flex;justify-content:space-between;gap:6px;padding:2.5px 0;color:var(--ink); }
+.za-metric-row span:first-child{ color:var(--ink-soft); }
+.za-metric-row b{ font-weight:bold;color:var(--navy);font-variant-numeric:tabular-nums; }
+.za-metric-extra{ color:#8FA0B3; }
+
+/* ---------- zone chips + zone report header ---------- */
+.zone-common-block{ margin-bottom:26px;padding:16px 18px 18px;background:var(--gold-light);border:1px solid var(--gold-line);border-radius:12px; }
+.zone-common-title{ font-size:11px;text-transform:uppercase;letter-spacing:0.4px;color:var(--ink-soft);margin:0 0 10px; }
+.zone-chips{ display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px; }
+.zone-chip{ padding:9px 20px;border:1px solid var(--sky-line);background:#fff;color:var(--steel);font-size:12.5px;font-weight:bold;border-radius:20px;cursor:pointer;transition:box-shadow 0.15s,background 0.15s; }
+.zone-chip:hover{ background:var(--gold-light); }
+.zone-chip.active{ background:linear-gradient(180deg,var(--steel),var(--navy));border-color:var(--navy);color:#fff;box-shadow:0 2px 8px rgba(18,42,67,0.22); }
+.zone-report-head{ display:flex;align-items:center;justify-content:space-between;margin-bottom:10px; }
+.zone-report-title{ font-family:Georgia,serif;font-size:16px;color:var(--navy);font-weight:bold; }
+
+@media (max-width: 980px){
+  .za-cards{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
+}
+
 @media (max-width: 640px){
   .sheet-wrap{ padding:14px;margin:12px auto 32px; }
   table.kpi-table{ display:block;overflow-x:auto;white-space:nowrap; }
   .navbar{ flex-wrap:wrap;gap:10px; }
+  .control-bar{ flex-direction:column;align-items:stretch; }
+  .view-tabs{ width:100%; }
+  .view-tabs button{ flex:1;padding:9px 6px;font-size:11.5px; }
+  .pdf-btn{ width:100%; }
+  .za-cards{ grid-template-columns:repeat(2, minmax(0, 1fr));gap:10px; }
+  .za-card{ padding:12px 12px 10px; }
+  .za-pct{ font-size:22px; }
+  .zone-chips{ gap:6px; }
+  .zone-chip{ padding:7px 14px;font-size:11.5px; }
+}
+
+@media (max-width: 480px){
+  .za-cards{ grid-template-columns:1fr; }
+  .zone-report-title{ font-size:13.5px; }
+  body{ padding:0; }
+  .login-card{ padding:20px 18px 18px; }
+  .login-title{ font-size:14.5px; }
 }

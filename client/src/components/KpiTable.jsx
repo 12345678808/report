@@ -12,7 +12,7 @@ function statusMeta(status) {
   return null;
 }
 
-export default function KpiTable({ rows, canEdit, onSave, zoneId, date }) {
+export default function KpiTable({ rows, canEdit, onSave, zoneId, date, onViewAnalytics }) {
   const [editingId, setEditingId] = useState(null);
   const [draft, setDraft] = useState({ target: '', achievement: '', note: '' });
   const [savingId, setSavingId] = useState(null);
@@ -47,15 +47,16 @@ export default function KpiTable({ rows, canEdit, onSave, zoneId, date }) {
     <table className="kpi-table">
       <thead>
         <tr>
-          <th>S.No</th>
-          <th>Department</th>
+          <th style={{ width: '5%' }}>S.No</th>
+          <th style={{ width: '14%' }}>Department</th>
           <th>Report / KPI Parameter</th>
-          <th>Target</th>
-          <th>Achievement</th>
-          <th>Pending</th>
-          <th>Performance %</th>
-          <th>Status</th>
-          {canEdit && <th>Edit</th>}
+          <th style={{ width: '9%' }}>Target</th>
+          <th style={{ width: '11%' }}>Achievement</th>
+          <th style={{ width: '9%' }}>Pending</th>
+          <th style={{ width: '11%' }}>Performance %</th>
+          <th style={{ width: '9%' }}>Status</th>
+          <th style={{ width: '9%' }} className="analytics-col">Analytics</th>
+          {canEdit && <th className="edit-col">Edit</th>}
         </tr>
       </thead>
       <tbody>
@@ -99,8 +100,32 @@ export default function KpiTable({ rows, canEdit, onSave, zoneId, date }) {
                   </span>
                 )}
               </td>
+              <td className="center analytics-cell">
+                <button
+                  type="button"
+                  className="analytics-btn"
+                  onClick={() =>
+                    onViewAnalytics({
+                      dept: row.department,
+                      report: row.reportName,
+                      target: row.target,
+                      achievement: row.achievement,
+                      pending: row.pending,
+                      performance: row.performance,
+                      status: row.status,
+                      note: row.note,
+                    })
+                  }
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 3v18h18" />
+                    <path d="M7 15l4-6 4 4 5-8" />
+                  </svg>
+                  View
+                </button>
+              </td>
               {canEdit && (
-                <td className="center">
+                <td className="center edit-col">
                   {isEditing ? (
                     <>
                       <button
