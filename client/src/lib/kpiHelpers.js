@@ -58,3 +58,60 @@ export function computeZoneStats(rows) {
   const pct = pairedTgt > 0 ? (pairedAch / pairedTgt) * 100 : null;
   return { units, pct };
 }
+
+// Same pending/performance/status formula the backend uses when saving one
+// entry (see server/src/services/kpiStore.js deriveStatus) — replicated here
+// so client-side aggregates (e.g. the citywide rollup below) land on the
+// exact same Ok/Medium/Low thresholds as a real saved entry would.
+export function deriveStatus(target, achievement) {
+  const pending = target !== null && achievement !== null ? target - achievement : null;
+  const performance = target !== null && target > 0 && achievement !== null ? achievement / target : null;
+  let status = null;
+  if (performance !== null) {
+    const pct = performance * 100;
+    status = pct >= 85 ? 'Ok' : pct >= 50 ? 'Medium' : 'Low';
+  }
+  return { pending, performance, status };
+}
+
+// Builds a citywide rollup of the 28 zone-scoped KPI items by summing each
+// item's target/achievement across all 5 zones — so the Overall report can
+// show all 32 KPIs (4 common + 28 citywide-summed) instead of just the 4
+// common ones. Marked `editable: false, zoneAggregate: true` since a summed
+// figure isn't a single real row to save — admins edit the real per-zone
+// numbers from the Zone report tab instead.
+export function buildCitywideRows(zones, rowsByZoneId) {
+  const byItemId = new Map();
+  for (const zone of zones) {
+    const rows = rowsByZoneId[zone.id] || [];
+    for (const row of rows) {
+      if (!byItemId.has(row.kpiItemId)) {
+        byItemId.set(row.kpiItemId, {
+          kpiItemId: row.kpiItemId,
+          sno: row.sno,
+          department: row.department,
+          reportName: row.reportName,
+          unit: row.unit,
+          target: null,
+          achievement: null,
+          note: '',
+          editable: false,
+          zoneAggregate: true,
+        });
+      }
+      const acc = byItemId.get(row.kpiItemId);
+      if (row.target !== null && row.target !== undefined) {
+        acc.target = (acc.target ?? 0) + Number(row.target);
+      }
+      if (row.achievement !== null && row.achievement !== undefined) {
+        acc.achievement = (acc.achievement ?? 0) + Number(row.achievement);
+      }
+    }
+  }
+  return Array.from(byItemId.values())
+    .sort((a, b) => a.sno - b.sno)
+    .map((row) => {
+      const { pending, performance, status } = deriveStatus(row.target, row.achievement);
+      return { ...row, pending, performance, status };
+    });
+}

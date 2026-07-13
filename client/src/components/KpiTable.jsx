@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 
 function fmtPct(performance) {
   if (performance === null || performance === undefined) return '';
@@ -60,11 +60,19 @@ export default function KpiTable({ rows, canEdit, onSave, zoneId, date, onViewAn
         </tr>
       </thead>
       <tbody>
-        {rows.map((row) => {
+        {rows.map((row, i) => {
           const meta = statusMeta(row.status);
           const isEditing = editingId === row.kpiItemId;
+          const rowEditable = canEdit && row.editable !== false;
+          const showDeptHeading = i === 0 || rows[i - 1].department !== row.department;
           return (
-            <tr key={row.kpiItemId}>
+            <Fragment key={row.kpiItemId}>
+              {showDeptHeading && (
+                <tr className="dept-group-row">
+                  <td colSpan={canEdit ? 10 : 9}>{row.department}</td>
+                </tr>
+              )}
+              <tr>
               <td className="center">{row.sno}</td>
               <td className="dept">{row.department}</td>
               <td>{row.reportName}</td>
@@ -126,7 +134,9 @@ export default function KpiTable({ rows, canEdit, onSave, zoneId, date, onViewAn
               </td>
               {canEdit && (
                 <td className="center edit-col">
-                  {isEditing ? (
+                  {!rowEditable ? (
+                    <span className="edit-elsewhere">Zone report</span>
+                  ) : isEditing ? (
                     <>
                       <button
                         className="mini-btn save"
@@ -146,7 +156,8 @@ export default function KpiTable({ rows, canEdit, onSave, zoneId, date, onViewAn
                   )}
                 </td>
               )}
-            </tr>
+              </tr>
+            </Fragment>
           );
         })}
       </tbody>

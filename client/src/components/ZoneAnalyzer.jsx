@@ -8,20 +8,15 @@
 
 import { computeZoneStats, fmtNum, tierChartColor, tierFromStatus } from '../lib/kpiHelpers';
 
+// Only the paired target/achievement figures are shown here — a unit with
+// achievement logged but no comparable target isn't shown as a lone number,
+// since without a target it can't be read as progress toward anything.
 function metricLine(label, u) {
-  if (!u.hasPaired && u.unpaired === 0) {
-    return (
-      <div className="za-metric-row" key={label}>
-        <span>{label}:</span>
-        <b>—</b>
-      </div>
-    );
-  }
   if (!u.hasPaired) {
     return (
       <div className="za-metric-row" key={label}>
         <span>{label}:</span>
-        <b>{fmtNum(u.unpaired)} logged</b>
+        <b>—</b>
       </div>
     );
   }
@@ -31,7 +26,6 @@ function metricLine(label, u) {
       <b>
         {fmtNum(u.pAch)} / {fmtNum(u.pTgt)}
       </b>
-      {u.unpaired > 0 && <span className="za-metric-extra"> (+{fmtNum(u.unpaired)} logged)</span>}
     </div>
   );
 }

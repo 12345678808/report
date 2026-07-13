@@ -93,6 +93,7 @@ table.kpi-table{ width:100%;border-collapse:separate;border-spacing:0;font-size:
 .kpi-table td.num{ text-align:right;font-variant-numeric:tabular-nums; }
 .kpi-table td.center{ text-align:center; }
 .kpi-table td.dept{ font-weight:bold;color:var(--steel); }
+.dept-group-row td{ background:var(--navy) !important;color:#fff;font-size:11.5px;font-weight:bold;letter-spacing:0.6px;text-transform:uppercase;padding:7px 10px;border:none; }
 .kpi-table input[type="number"]{ width:80px;padding:5px 7px;border:1px solid var(--sky-line);border-radius:6px;text-align:right; }
 
 .status-pill{ display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:bold; }
@@ -103,6 +104,7 @@ table.kpi-table{ width:100%;border-collapse:separate;border-spacing:0;font-size:
 
 .mini-btn{ padding:5px 10px;margin:0 2px;border:1px solid var(--sky-line);border-radius:6px;background:#fff;font-size:11.5px;font-weight:bold;color:var(--steel);cursor:pointer; }
 .mini-btn.save{ background:var(--navy);color:#fff;border-color:var(--navy); }
+.edit-elsewhere{ font-size:10.5px;color:var(--ink-soft);font-style:italic; }
 
 /* ---------- View Analytics button + modal ---------- */
 .analytics-btn{ display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border:1px solid var(--steel);background:#fff;color:var(--steel);font-size:10.5px;font-weight:bold;border-radius:14px;cursor:pointer;white-space:nowrap; }

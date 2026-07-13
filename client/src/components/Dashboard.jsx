@@ -5,6 +5,7 @@ import ZoneAnalyzer from './ZoneAnalyzer';
 import PrintLetterhead from './PrintLetterhead';
 import AnalyticsModal from './AnalyticsModal';
 import Navbar from './Navbar';
+import { buildCitywideRows } from '../lib/kpiHelpers';
 
 const DATE = '2026-07-12'; // the one date seeded in the core MVP; wire up a real picker in a later iteration
 
@@ -74,40 +75,49 @@ export default function Dashboard({ user, onLoggedOut }) {
     loadCommon();
   }, []);
 
-  // Load the zone catalog + every zone's rows the first time the Zone report
-  // tab is opened (not on initial mount) — no point fetching 5x28 rows for
-  // someone who only ever looks at the Overall report.
+  // Load the zone catalog + every zone's rows on mount. The Overall report
+  // needs these too now (it shows a citywide rollup of the 28 zone-scoped
+  // items alongside the 4 common ones — see buildCitywideRows), so this can
+  // no longer wait for the Zone report tab to be opened first.
+  //
+  // Deliberately no "cancelled" guard here (unlike a typical fetch effect):
+  // with an empty dep array this effect's setup only ever runs once for
+  // real, and the zonesLoadedRef check above already stops a second real
+  // invocation from re-fetching. The one place a cancelled-style guard would
+  // seem to matter is React StrictMode's dev-only mount→cleanup→remount
+  // cycle — but there it actively breaks things: cleanup fires while the
+  // first instance's fetch is still in flight, a "cancelled" flag would
+  // make it bail out before calling setZoneRowsById/setLoadingZones(false),
+  // and the second (kept) instance never restarts the fetch because the ref
+  // is already set — leaving the Overall/Zone report stuck on "Loading…"
+  // forever. Letting the first instance's promise finish and set state is
+  // exactly correct in both the StrictMode-double-invoke case and the
+  // normal single-invoke case.
   useEffect(() => {
-    if (view !== 'zone' || zonesLoadedRef.current) return;
+    if (zonesLoadedRef.current) return;
     zonesLoadedRef.current = true;
-    let cancelled = false;
     async function loadAllZones() {
       setLoadingZones(true);
       setError('');
       try {
         const zoneList = await api.zones();
-        if (cancelled) return;
         setZones(zoneList);
         setActiveZoneId(zoneList[0]?.id ?? null);
         const results = await Promise.all(zoneList.map((z) => api.zoneItems(z.id, DATE)));
-        if (cancelled) return;
         const byId = {};
         zoneList.forEach((z, i) => {
           byId[z.id] = results[i];
         });
         setZoneRowsById(byId);
       } catch (err) {
-        if (!cancelled) setError(err.message);
-        if (!cancelled) zonesLoadedRef.current = false; // allow retry on next tab switch
+        setError(err.message);
+        zonesLoadedRef.current = false; // allow a retry (e.g. switching tabs) after a real failure
       } finally {
-        if (!cancelled) setLoadingZones(false);
+        setLoadingZones(false);
       }
     }
     loadAllZones();
-    return () => {
-      cancelled = true;
-    };
-  }, [view]);
+  }, []);
 
   async function handleSaveCommon(payload) {
     const saved = await api.saveEntry(payload);
@@ -184,6 +194,12 @@ export default function Dashboard({ user, onLoggedOut }) {
   const canEdit = user.role === 'admin';
   const activeZone = zones.find((z) => z.id === activeZoneId);
   const activeZoneRows = activeZoneId != null ? zoneRowsById[activeZoneId] || [] : [];
+  // All 32 KPIs for the Overall report: the 4 real common (citywide) rows,
+  // editable as usual, plus a read-only citywide rollup of the 28 zone-scoped
+  // rows (summed across all 5 zones) — see buildCitywideRows for why those
+  // aren't directly editable here.
+  const overallRows = [...commonRows, ...buildCitywideRows(zones, zoneRowsById)];
+  const loadingOverall = loadingCommon || (loadingZones && zones.length === 0);
 
   return (
     <div className="dashboard">
@@ -213,11 +229,11 @@ export default function Dashboard({ user, onLoggedOut }) {
         </div>
 
         {view === 'overall' &&
-          (loadingCommon ? (
+          (loadingOverall ? (
             <p>Loading…</p>
           ) : (
             <KpiTable
-              rows={commonRows}
+              rows={overallRows}
               canEdit={canEdit}
               onSave={handleSaveCommon}
               zoneId={null}
