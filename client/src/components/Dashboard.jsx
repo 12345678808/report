@@ -4,6 +4,7 @@ import KpiTable from './KpiTable';
 import ZoneAnalyzer from './ZoneAnalyzer';
 import PrintLetterhead from './PrintLetterhead';
 import AnalyticsModal from './AnalyticsModal';
+import Navbar from './Navbar';
 
 const DATE = '2026-07-12'; // the one date seeded in the core MVP; wire up a real picker in a later iteration
 
@@ -186,21 +187,7 @@ export default function Dashboard({ user, onLoggedOut }) {
 
   return (
     <div className="dashboard">
-      <header className="navbar">
-        <div>
-          <div className="navbar-org">Coimbatore City Municipal Corporation</div>
-          <div className="navbar-sub">Department-wise Performance Dashboard</div>
-        </div>
-        <div className="navbar-user">
-          <div>
-            <div className="navbar-user-name">{user.displayName}</div>
-            <div className="navbar-user-role">CCMC {user.role.toUpperCase()}</div>
-          </div>
-          <button className="logout-btn" onClick={handleLogout}>
-            Log out
-          </button>
-        </div>
-      </header>
+      <Navbar user={user} onLogout={handleLogout} />
 
       <main className="sheet-wrap">
         <PrintLetterhead
