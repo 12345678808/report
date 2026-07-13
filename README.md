@@ -106,6 +106,83 @@ If you run the backend on a different host/port, set `client/.env`:
 VITE_API_BASE=http://localhost:4000/api
 ```
 
+## Putting it on the internet (free hosting: Render + Vercel)
+
+Running it locally is fine for you, but nobody else can open a `localhost` link — to
+share a real URL with your team or clients, the backend and frontend each need to be
+hosted somewhere. This section deploys the backend to **Render** (free tier) and the
+frontend to **Vercel** (free tier), both deploying straight from the GitHub repo you
+already pushed.
+
+**Why two separate hosts?** The backend is a real always-listening Node server (needs a
+process host); the frontend, once built, is just static files (HTML/JS/CSS) that any
+static host can serve. Splitting them like this is the standard, and free-tier-friendly,
+way to run this kind of app.
+
+### 1. Deploy the backend to Render
+
+1. Go to [render.com](https://render.com) → sign up/log in (GitHub login is the
+   easiest option since your code is already there).
+2. **New +** → **Web Service** → connect your `report` GitHub repo.
+3. Set:
+   - **Root Directory**: `server`
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm run migrate && npm start` (migrate is safe to run every
+     boot — it only creates things that don't already exist)
+4. Under **Environment Variables**, add everything from your `server/.env` file:
+   `DATABASE_URL`, `JWT_SECRET`, `GOOGLE_SHEETS_ENABLED` (and the other Sheets ones if
+   you've set that up), plus two new ones:
+   - `NODE_ENV` = `production`
+   - `CLIENT_ORIGIN` = (leave a placeholder like `https://placeholder.com` for now —
+     you'll come back and fix this in step 3, once you know your Vercel URL)
+5. Deploy. Once it's live, Render gives you a URL like
+   `https://report-xxxx.onrender.com` — check `https://report-xxxx.onrender.com/api/health`
+   returns `{"ok":true}`.
+6. **Seed the real database once**, from your own computer (this sandbox can't reach
+   your Neon database, but your computer can): `cd server`, `npm install`, then
+   `npm run seed`. This only needs to happen once — it wipes and reloads the demo
+   accounts and KPI catalog. Re-run it any time you want to reset to that starting data.
+
+Free-tier note: Render's free web services go to sleep after 15 minutes of no traffic,
+so the very first request after a quiet spell takes 30-60 seconds to wake back up. Fine
+for a demo or small team; if that's annoying for real client use, Render's paid tier
+($7/mo and up) keeps it always-on.
+
+### 2. Deploy the frontend to Vercel
+
+1. Go to [vercel.com](https://vercel.com) → sign up/log in with GitHub.
+2. **Add New** → **Project** → import the same `report` repo.
+3. Set **Root Directory** to `client` (Vercel auto-detects the Vite framework preset).
+4. Under **Environment Variables**, add:
+   - `VITE_API_BASE` = `https://report-xxxx.onrender.com/api` (your actual Render URL
+     from step 1, with `/api` on the end)
+5. Deploy. You'll get a URL like `https://report.vercel.app` — that's the link you
+   share.
+
+### 3. Finish wiring the two together
+
+Go back to Render → your web service → **Environment** → update `CLIENT_ORIGIN` to your
+exact Vercel URL (`https://report.vercel.app`, no trailing slash) → save (Render
+redeploys automatically on env var changes).
+
+Open your Vercel URL and log in with the demo accounts (or your real company logins, if
+you've already run `npm run user:set`). If login succeeds but the dashboard immediately
+looks logged-out again, double check `CLIENT_ORIGIN` on Render matches your Vercel URL
+**exactly** (including `https://`, no trailing slash) — a mismatch there is the most
+common cause, since the browser will only send the login cookie back to Render if
+Render's CORS config recognizes the site making the request.
+
+### A note on the login cookie and cross-domain hosting
+
+Locally, the React app and the API are both technically on `localhost` (just different
+ports), which browsers treat as the same "site" for cookie purposes. Once deployed,
+`your-app.vercel.app` and `your-api.onrender.com` are genuinely different domains — a
+cross-site setup — and browsers only send cookies cross-site under stricter rules. This
+project already handles it: when `NODE_ENV=production`, the login cookie is set with
+`SameSite=None; Secure` instead of the local-dev `SameSite=Lax`, which is what makes
+cross-domain login work at all. You don't need to change anything for this — just make
+sure `NODE_ENV=production` is set on Render (step 1 above already covers it).
+
 ## How it works
 
 - **Auth**: `POST /api/auth/login` checks the bcrypt hash in `users`, signs a JWT, and
