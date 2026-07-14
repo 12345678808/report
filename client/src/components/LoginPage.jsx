@@ -14,7 +14,12 @@ export default function LoginPage({ onLoggedIn }) {
     setError('');
     setBusy(true);
     try {
-      const user = await api.login(username.trim(), password);
+      // The Admin/Commissioner toggle above isn't just decoration — it's sent
+      // along with the credentials, and the server rejects the login if the
+      // account's real role doesn't match whichever tab is selected. That
+      // way picking the wrong tab gives a clear "wrong role selected" error
+      // instead of silently logging you in as the other role.
+      const user = await api.login(username.trim(), password, role);
       onLoggedIn(user);
     } catch (err) {
       setError(err.message);
@@ -60,10 +65,6 @@ export default function LoginPage({ onLoggedIn }) {
             {busy ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
-
-        <p className="login-note">
-          Demo access &mdash; admin / admin@2026 &nbsp;|&nbsp; commissioner / comm@2026
-        </p>
       </div>
     </div>
   );

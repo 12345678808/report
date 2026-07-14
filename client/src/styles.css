@@ -13,18 +13,22 @@ body{ background: var(--paper); color: var(--ink); }
   position:absolute;
   bottom:-80px;
   border-radius:50%;
-  background:radial-gradient(circle at 30% 30%, rgba(255,255,255,0.85), rgba(201,162,75,0.12) 60%, rgba(36,92,130,0.08) 100%);
-  border:1px solid rgba(255,255,255,0.5);
-  box-shadow:0 0 12px rgba(36,92,130,0.06);
+  /* A near-white bubble on a near-white page background is basically
+     invisible no matter the opacity — the fix is more color contrast
+     (a soft sky-blue/gold pastel tint), not just higher alpha. Still a
+     light/pastel palette, just one that actually shows up. */
+  background:radial-gradient(circle at 30% 30%, rgba(255,255,255,0.95), rgba(150,195,230,0.6) 55%, rgba(196,160,90,0.4) 100%);
+  border:1.5px solid rgba(120,170,210,0.6);
+  box-shadow:0 0 18px rgba(36,92,130,0.22), inset 0 0 12px rgba(255,255,255,0.7);
   animation-name: bubbleFloat;
   animation-timing-function: ease-in;
   animation-iteration-count: infinite;
 }
 @keyframes bubbleFloat{
   0%{ transform:translateY(0) translateX(0); opacity:0; }
-  10%{ opacity:0.9; }
-  50%{ transform:translateY(-52vh) translateX(14px); }
-  90%{ opacity:0.5; }
+  10%{ opacity:1; }
+  50%{ transform:translateY(-52vh) translateX(14px); opacity:0.85; }
+  90%{ opacity:0.6; }
   100%{ transform:translateY(-108vh) translateX(-10px); opacity:0; }
 }
 @media (prefers-reduced-motion: reduce){

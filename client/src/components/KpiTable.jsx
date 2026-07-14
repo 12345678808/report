@@ -24,6 +24,15 @@ export default function KpiTable({
   showDeptHeadings = true,
   customColumns = [],
   onDeleteColumn,
+  // While a PDF export is being captured, the Analytics and Edit columns
+  // used to stay in the DOM and get hidden with CSS (display:none). That
+  // works fine for a live browser render, but html2canvas (used by the PDF
+  // export) doesn't reliably recompute a colSpan against columns that are
+  // present-but-hidden — it was leaving the navy department-heading bars
+  // roughly 20% short of the table's real width. Actually removing those
+  // columns from the DOM during export (not just hiding them) sidesteps the
+  // bug entirely, since there's nothing left for html2canvas to miscount.
+  isExportingPdf = false,
 }) {
   const [editingId, setEditingId] = useState(null);
   const [draft, setDraft] = useState({ target: '', achievement: '', note: '', customValues: {} });
@@ -81,9 +90,10 @@ export default function KpiTable({
     onDeleteColumn(col.id);
   }
 
-  const showEditCol = canEdit || canManageCatalog;
-  const baseColCount = 9; // S.No, Dept, Report, Target, Achievement, Pending, Performance, Status, Analytics
-  const colSpan = baseColCount + customColumns.length + (showEditCol ? 1 : 0);
+  const showEditCol = (canEdit || canManageCatalog) && !isExportingPdf;
+  const showAnalyticsCol = !isExportingPdf;
+  const baseColCount = 8; // S.No, Dept, Report, Target, Achievement, Pending, Performance, Status
+  const colSpan = baseColCount + customColumns.length + (showAnalyticsCol ? 1 : 0) + (showEditCol ? 1 : 0);
 
   return (
     <table className="kpi-table">
@@ -112,7 +122,7 @@ export default function KpiTable({
               )}
             </th>
           ))}
-          <th style={{ width: '9%' }} className="analytics-col">Analytics</th>
+          {showAnalyticsCol && <th style={{ width: '9%' }} className="analytics-col">Analytics</th>}
           {showEditCol && <th className="edit-col">Edit</th>}
         </tr>
       </thead>
@@ -180,30 +190,32 @@ export default function KpiTable({
                   )}
                 </td>
               ))}
-              <td className="center analytics-cell">
-                <button
-                  type="button"
-                  className="analytics-btn"
-                  onClick={() =>
-                    onViewAnalytics({
-                      dept: row.department,
-                      report: row.reportName,
-                      target: row.target,
-                      achievement: row.achievement,
-                      pending: row.pending,
-                      performance: row.performance,
-                      status: row.status,
-                      note: row.note,
-                    })
-                  }
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M3 3v18h18" />
-                    <path d="M7 15l4-6 4 4 5-8" />
-                  </svg>
-                  View
-                </button>
-              </td>
+              {showAnalyticsCol && (
+                <td className="center analytics-cell">
+                  <button
+                    type="button"
+                    className="analytics-btn"
+                    onClick={() =>
+                      onViewAnalytics({
+                        dept: row.department,
+                        report: row.reportName,
+                        target: row.target,
+                        achievement: row.achievement,
+                        pending: row.pending,
+                        performance: row.performance,
+                        status: row.status,
+                        note: row.note,
+                      })
+                    }
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M3 3v18h18" />
+                      <path d="M7 15l4-6 4 4 5-8" />
+                    </svg>
+                    View
+                  </button>
+                </td>
+              )}
               {showEditCol && (
                 <td className="center edit-col">
                   {isEditing ? (

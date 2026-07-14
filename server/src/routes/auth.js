@@ -25,7 +25,7 @@ const cookieOpts = {
 };
 
 router.post('/login', async (req, res) => {
-  const { username, password } = req.body || {};
+  const { username, password, role } = req.body || {};
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password are required.' });
   }
@@ -35,6 +35,18 @@ router.post('/login', async (req, res) => {
 
   const ok = await bcrypt.compare(password, user.password_hash);
   if (!ok) return res.status(401).json({ error: 'Incorrect username or password.' });
+
+  // The login screen's Admin/Commissioner toggle is a real selection, not
+  // decoration — if the account's actual role doesn't match whichever tab
+  // was selected, reject with a message telling them which tab to pick,
+  // rather than silently logging them in under the tab they didn't choose.
+  if (role && role !== user.role) {
+    const roleLabel = user.role === 'admin' ? 'an Admin' : 'a Commissioner';
+    const tabLabel = user.role === 'admin' ? 'Admin' : 'Commissioner';
+    return res.status(401).json({
+      error: `This account is ${roleLabel} login — select "${tabLabel}" above and try again.`,
+    });
+  }
 
   const token = signToken(user);
   res.cookie(COOKIE_NAME, token, cookieOpts);

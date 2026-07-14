@@ -334,6 +334,29 @@ export default function Dashboard({ user, onLoggedOut }) {
         header,
         ...body,
       ]);
+      // Left to itself, SheetJS defaults every column to Excel's ~8.4-char
+      // width, which visually clips longer department/report-name text (the
+      // data isn't lost, but it *looks* cut off in the cell) — explicit
+      // widths, roughly matched to the longest real values in this catalog,
+      // fix that.
+      sheet['!cols'] = [
+        { wch: 6 }, // S.No
+        { wch: 16 }, // Department
+        { wch: 48 }, // Report / KPI Parameter
+        { wch: 11 }, // Target
+        { wch: 13 }, // Achievement
+        { wch: 11 }, // Pending
+        { wch: 14 }, // Performance %
+        { wch: 10 }, // Status
+        ...customColumns.map(() => ({ wch: 18 })),
+      ];
+      // Merge the two title rows across the full column width so they read
+      // as a proper report header instead of overflowing into column B.
+      const lastColIdx = header.length - 1;
+      sheet['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: lastColIdx } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: lastColIdx } },
+      ];
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, sheet, scopeLabel.slice(0, 31) || 'Report');
       XLSX.writeFile(workbook, `CCMC_${scopeLabel}_KPI_Report_${rangeSlug()}.xlsx`.replace(/\s+/g, '_'));
@@ -471,6 +494,7 @@ export default function Dashboard({ user, onLoggedOut }) {
                 showDeptHeadings={false}
                 customColumns={customColumns}
                 onDeleteColumn={handleDeleteColumn}
+                isExportingPdf={isExportingPdf}
               />
             </>
           ))}
@@ -493,6 +517,7 @@ export default function Dashboard({ user, onLoggedOut }) {
                   date={fromDate}
                   onViewAnalytics={handleViewAnalytics}
                   customColumns={customColumns}
+                  isExportingPdf={isExportingPdf}
                 />
               </div>
 
@@ -526,6 +551,7 @@ export default function Dashboard({ user, onLoggedOut }) {
                     onViewAnalytics={handleViewZoneAnalytics}
                     customColumns={customColumns}
                     onDeleteColumn={handleDeleteColumn}
+                    isExportingPdf={isExportingPdf}
                   />
                 </>
               )}
