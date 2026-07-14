@@ -25,6 +25,16 @@ export function tierFromStatus(status) {
   return null;
 }
 
+// The stored/derived tier value stays 'Ok' internally everywhere (deriveStatus's
+// 85% threshold, tierChartColor/tierPastelColor lookups, the dot-yellow CSS
+// class, etc.) — only the text shown to the user changes, per an explicit
+// request to relabel the yellow ("Ok") tier as "Completed" without touching
+// any of the underlying logic those other places depend on.
+export function tierLabel(tier) {
+  if (tier === 'Ok') return 'Completed';
+  return tier;
+}
+
 export function fmtNum(n) {
   if (n === null || n === undefined || Number.isNaN(n)) return '—';
   return Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 });

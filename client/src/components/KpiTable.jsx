@@ -1,4 +1,5 @@
 import { Fragment, useState } from 'react';
+import { tierLabel } from '../lib/kpiHelpers';
 
 function fmtPct(performance) {
   if (performance === null || performance === undefined) return '';
@@ -6,7 +7,9 @@ function fmtPct(performance) {
 }
 
 function statusMeta(status) {
-  if (status === 'Ok') return { label: 'Ok', cls: 'dot-yellow' };
+  // The stored status stays 'Ok' (color/threshold logic elsewhere depends on
+  // it) — tierLabel() only changes what text is shown for it ("Completed").
+  if (status === 'Ok') return { label: tierLabel('Ok'), cls: 'dot-yellow' };
   if (status === 'Medium') return { label: 'Medium', cls: 'dot-green' };
   if (status === 'Low') return { label: 'Low', cls: 'dot-red' };
   return null;

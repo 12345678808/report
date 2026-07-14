@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { computeZoneStats, fmtNum, tierChartColor, tierPastelColor, tierFromStatus } from '../lib/kpiHelpers';
+import { computeZoneStats, fmtNum, tierChartColor, tierPastelColor, tierFromStatus, tierLabel } from '../lib/kpiHelpers';
 
 const MONTH_NAMES_FULL = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -221,7 +221,7 @@ export default function AnalyticsModal({ info, dateIso, onClose }) {
 
         {tier && (
           <span className="modal-status-pill" style={{ background: tierPastelColor(tier) }}>
-            {tier} performance
+            {tierLabel(tier)} performance
           </span>
         )}
 
@@ -275,7 +275,7 @@ export default function AnalyticsModal({ info, dateIso, onClose }) {
         <div className="modal-legend">
           <span><i style={{ background: '#E5484D' }} />Low performance</span>
           <span><i style={{ background: '#2FAE60' }} />Medium performance</span>
-          <span><i style={{ background: '#E8B93A' }} />Ok performance</span>
+          <span><i style={{ background: '#E8B93A' }} />{tierLabel('Ok')} performance</span>
           <span><i style={{ background: '#fff', border: '1.5px solid #A9776B' }} />Target value</span>
         </div>
 

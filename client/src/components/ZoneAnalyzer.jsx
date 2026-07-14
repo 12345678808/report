@@ -6,7 +6,7 @@
 // since the existing GET /api/kpi/zone/:zoneId already returns everything
 // needed per row.
 
-import { computeZoneStats, tierChartColor, tierFromStatus } from '../lib/kpiHelpers';
+import { computeZoneStats, tierChartColor, tierFromStatus, tierLabel } from '../lib/kpiHelpers';
 
 export default function ZoneAnalyzer({ zones, rowsByZoneId }) {
   return (
@@ -41,7 +41,7 @@ export default function ZoneAnalyzer({ zones, rowsByZoneId }) {
           const color = tierChartColor(tier);
           const tint = tier ? `${color}1a` : 'var(--sky)';
           const barWidth = pct === null ? 0 : Math.max(0, Math.min(100, pct));
-          const tierText = tier || 'No data yet';
+          const tierText = tier ? tierLabel(tier) : 'No data yet';
           const pctText = pct === null ? '—' : `${Math.round(pct * 10) / 10}%`;
           return (
             <div className="za-card" key={zone.id} style={{ '--za-tier': color, '--za-tint': tint }}>

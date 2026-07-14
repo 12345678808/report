@@ -8,7 +8,7 @@ import AnalyticsModal from './AnalyticsModal';
 import AddRowModal from './AddRowModal';
 import AddColumnModal from './AddColumnModal';
 import Navbar from './Navbar';
-import { buildCitywideRows } from '../lib/kpiHelpers';
+import { buildCitywideRows, tierLabel } from '../lib/kpiHelpers';
 
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 function pad2(n) {
@@ -324,7 +324,7 @@ export default function Dashboard({ user, onLoggedOut }) {
         r.achievement ?? '',
         r.pending ?? '',
         r.performance !== null && r.performance !== undefined ? `${(r.performance * 100).toFixed(2)}%` : '',
-        r.status ?? '',
+        r.status ? tierLabel(r.status) : '',
         ...customColumns.map((c) => (r.customValues ? r.customValues[c.id] ?? '' : '')),
       ]);
       const sheet = XLSX.utils.aoa_to_sheet([
