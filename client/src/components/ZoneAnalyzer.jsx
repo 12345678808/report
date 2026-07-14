@@ -8,7 +8,7 @@
 
 import { computeZoneStats, tierChartColor, tierFromStatus } from '../lib/kpiHelpers';
 
-export default function ZoneAnalyzer({ zones, rowsByZoneId, asOfDate }) {
+export default function ZoneAnalyzer({ zones, rowsByZoneId }) {
   return (
     <div className="zone-analyzer">
       <div className="za-head">
@@ -27,7 +27,6 @@ export default function ZoneAnalyzer({ zones, rowsByZoneId, asOfDate }) {
             </p>
           </div>
         </div>
-        <div className="za-asof">As of {asOfDate}</div>
       </div>
       <div className="za-cards">
         {zones.map((zone) => {

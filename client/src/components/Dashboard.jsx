@@ -251,18 +251,16 @@ export default function Dashboard({ user, onLoggedOut }) {
         {/* Demo-only date range filter — ported from one.html for visual parity.
             It doesn't refetch data (the MVP only has the one seeded DATE), so
             it's read-only, same as the source file's "figures stay as entered
-            on the sheet" behavior. */}
-        {view === 'overall' && (
-          <div className="date-filter">
-            <label htmlFor="filterFromDate">From</label>
-            <input type="date" id="filterFromDate" value={DATE} readOnly />
-            <span className="to-sep">&ndash; To &ndash;</span>
-            <input type="date" id="filterToDate" value={DATE} readOnly />
-            <span className="date-filter-note">
-              Demo filter &mdash; changes the date range shown above; KPI figures stay as entered on the sheet.
-            </span>
-          </div>
-        )}
+            on the sheet" behavior. Shown on both tabs. */}
+        <div className="date-filter">
+          <label htmlFor="filterFromDate">From</label>
+          <input type="date" id="filterFromDate" value={DATE} readOnly />
+          <span className="to-sep">&ndash; To &ndash;</span>
+          <input type="date" id="filterToDate" value={DATE} readOnly />
+          <span className="date-filter-note">
+            Demo filter &mdash; changes the date range shown above; KPI figures stay as entered on the sheet.
+          </span>
+        </div>
 
         {view === 'overall' &&
           (loadingOverall ? (
@@ -279,6 +277,7 @@ export default function Dashboard({ user, onLoggedOut }) {
                 zoneId={null}
                 date={DATE}
                 onViewAnalytics={handleViewAnalytics}
+                showDeptHeadings={false}
               />
             </>
           ))}
@@ -288,7 +287,7 @@ export default function Dashboard({ user, onLoggedOut }) {
             <p>Loading…</p>
           ) : (
             <>
-              <ZoneAnalyzer zones={zones} rowsByZoneId={zoneRowsById} asOfDate={dateLabel} />
+              <ZoneAnalyzer zones={zones} rowsByZoneId={zoneRowsById} />
 
               <div className="zone-common-block">
                 <p className="zone-common-title">Common for all zones &ndash; Public Health</p>

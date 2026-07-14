@@ -12,7 +12,7 @@ function statusMeta(status) {
   return null;
 }
 
-export default function KpiTable({ rows, canEdit, onSave, zoneId, date, onViewAnalytics }) {
+export default function KpiTable({ rows, canEdit, onSave, zoneId, date, onViewAnalytics, showDeptHeadings = true }) {
   const [editingId, setEditingId] = useState(null);
   const [draft, setDraft] = useState({ target: '', achievement: '', note: '' });
   const [savingId, setSavingId] = useState(null);
@@ -64,7 +64,7 @@ export default function KpiTable({ rows, canEdit, onSave, zoneId, date, onViewAn
           const meta = statusMeta(row.status);
           const isEditing = editingId === row.kpiItemId;
           const rowEditable = canEdit && row.editable !== false;
-          const showDeptHeading = i === 0 || rows[i - 1].department !== row.department;
+          const showDeptHeading = showDeptHeadings && (i === 0 || rows[i - 1].department !== row.department);
           return (
             <Fragment key={row.kpiItemId}>
               {showDeptHeading && (

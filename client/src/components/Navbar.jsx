@@ -43,13 +43,6 @@ export default function Navbar({ user, onLogout }) {
   return (
     <div className="navbar">
       <div className="navbar-left">
-        <button type="button" className="navbar-icon-btn" title="Menu">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <line x1="3" y1="6" x2="21" y2="6" />
-            <line x1="3" y1="12" x2="21" y2="12" />
-            <line x1="3" y1="18" x2="21" y2="18" />
-          </svg>
-        </button>
         <div className="seal">
           <CcmcSeal width={36} height={36} />
         </div>
