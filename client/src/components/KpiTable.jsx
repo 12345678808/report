@@ -12,10 +12,23 @@ function statusMeta(status) {
   return null;
 }
 
-export default function KpiTable({ rows, canEdit, onSave, zoneId, date, onViewAnalytics, showDeptHeadings = true }) {
+export default function KpiTable({
+  rows,
+  canEdit,
+  canManageCatalog = false,
+  onSave,
+  onDeleteRow,
+  zoneId,
+  date,
+  onViewAnalytics,
+  showDeptHeadings = true,
+  customColumns = [],
+  onDeleteColumn,
+}) {
   const [editingId, setEditingId] = useState(null);
-  const [draft, setDraft] = useState({ target: '', achievement: '', note: '' });
+  const [draft, setDraft] = useState({ target: '', achievement: '', note: '', customValues: {} });
   const [savingId, setSavingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   function startEdit(row) {
     setEditingId(row.kpiItemId);
@@ -23,6 +36,7 @@ export default function KpiTable({ rows, canEdit, onSave, zoneId, date, onViewAn
       target: row.target ?? '',
       achievement: row.achievement ?? '',
       note: row.note ?? '',
+      customValues: { ...(row.customValues || {}) },
     });
   }
 
@@ -36,12 +50,40 @@ export default function KpiTable({ rows, canEdit, onSave, zoneId, date, onViewAn
         target: draft.target === '' ? null : Number(draft.target),
         achievement: draft.achievement === '' ? null : Number(draft.achievement),
         note: draft.note,
+        customValues: Object.fromEntries(
+          Object.entries(draft.customValues || {}).map(([colId, val]) => [colId, val === '' ? null : Number(val)])
+        ),
       });
       setEditingId(null);
     } finally {
       setSavingId(null);
     }
   }
+
+  async function handleDeleteClick(row) {
+    if (deletingId) return;
+    const label = `${row.department} — ${row.reportName}`;
+    if (!window.confirm(`Permanently delete this KPI parameter?\n\n${label}\n\nThis removes all its logged figures across every date and zone. This cannot be undone.`)) {
+      return;
+    }
+    setDeletingId(row.kpiItemId);
+    try {
+      await onDeleteRow(row.kpiItemId);
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  function handleDeleteColumnClick(col) {
+    if (!window.confirm(`Delete the "${col.name}" column?\n\nThis removes its logged values for every row. This cannot be undone.`)) {
+      return;
+    }
+    onDeleteColumn(col.id);
+  }
+
+  const showEditCol = canEdit || canManageCatalog;
+  const baseColCount = 9; // S.No, Dept, Report, Target, Achievement, Pending, Performance, Status, Analytics
+  const colSpan = baseColCount + customColumns.length + (showEditCol ? 1 : 0);
 
   return (
     <table className="kpi-table">
@@ -55,21 +97,36 @@ export default function KpiTable({ rows, canEdit, onSave, zoneId, date, onViewAn
           <th style={{ width: '9%' }}>Pending</th>
           <th style={{ width: '11%' }}>Performance %</th>
           <th style={{ width: '9%' }}>Status</th>
+          {customColumns.map((col) => (
+            <th key={col.id} className="custom-col-th">
+              <span>{col.name}</span>
+              {canManageCatalog && (
+                <button
+                  type="button"
+                  className="custom-col-del"
+                  title={`Delete "${col.name}" column`}
+                  onClick={() => handleDeleteColumnClick(col)}
+                >
+                  &times;
+                </button>
+              )}
+            </th>
+          ))}
           <th style={{ width: '9%' }} className="analytics-col">Analytics</th>
-          {canEdit && <th className="edit-col">Edit</th>}
+          {showEditCol && <th className="edit-col">Edit</th>}
         </tr>
       </thead>
       <tbody>
         {rows.map((row, i) => {
           const meta = statusMeta(row.status);
           const isEditing = editingId === row.kpiItemId;
-          const rowEditable = canEdit && row.editable !== false;
+          const rowEditable = row.editable !== false;
           const showDeptHeading = showDeptHeadings && (i === 0 || rows[i - 1].department !== row.department);
           return (
             <Fragment key={row.kpiItemId}>
               {showDeptHeading && (
                 <tr className="dept-group-row">
-                  <td colSpan={canEdit ? 10 : 9}>{row.department}</td>
+                  <td colSpan={colSpan}>{row.department}</td>
                 </tr>
               )}
               <tr>
@@ -108,6 +165,21 @@ export default function KpiTable({ rows, canEdit, onSave, zoneId, date, onViewAn
                   </span>
                 )}
               </td>
+              {customColumns.map((col) => (
+                <td className="num" key={col.id}>
+                  {isEditing ? (
+                    <input
+                      type="number"
+                      value={draft.customValues[col.id] ?? ''}
+                      onChange={(e) =>
+                        setDraft((d) => ({ ...d, customValues: { ...d.customValues, [col.id]: e.target.value } }))
+                      }
+                    />
+                  ) : (
+                    (row.customValues && row.customValues[col.id]) ?? ''
+                  )}
+                </td>
+              ))}
               <td className="center analytics-cell">
                 <button
                   type="button"
@@ -132,11 +204,9 @@ export default function KpiTable({ rows, canEdit, onSave, zoneId, date, onViewAn
                   View
                 </button>
               </td>
-              {canEdit && (
+              {showEditCol && (
                 <td className="center edit-col">
-                  {!rowEditable ? (
-                    <span className="edit-elsewhere">Zone report</span>
-                  ) : isEditing ? (
+                  {isEditing ? (
                     <>
                       <button
                         className="mini-btn save"
@@ -150,9 +220,23 @@ export default function KpiTable({ rows, canEdit, onSave, zoneId, date, onViewAn
                       </button>
                     </>
                   ) : (
-                    <button className="mini-btn" onClick={() => startEdit(row)}>
-                      Edit
-                    </button>
+                    <div className="row-actions">
+                      {canEdit && rowEditable && (
+                        <button className="mini-btn" onClick={() => startEdit(row)}>
+                          Edit
+                        </button>
+                      )}
+                      {!rowEditable && <span className="edit-elsewhere">Zone report</span>}
+                      {canManageCatalog && (
+                        <button
+                          className="mini-btn delete"
+                          disabled={deletingId === row.kpiItemId}
+                          onClick={() => handleDeleteClick(row)}
+                        >
+                          {deletingId === row.kpiItemId ? '…' : 'Delete'}
+                        </button>
+                      )}
+                    </div>
                   )}
                 </td>
               )}

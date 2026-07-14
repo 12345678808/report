@@ -59,6 +59,31 @@ async function upsertEntry({ kpiItemId, zoneId, date, target, achievement, note 
   };
 }
 
+// Upsert one day's value for one (custom column, kpi item, + optional zone) —
+// same conflict-target trick as upsertEntry, for the same NULL-zone_id reason.
+async function upsertCustomColumnValue({ customColumnId, kpiItemId, zoneId, date, value }) {
+  const normalizedZoneId = zoneId || null;
+  const conflictClause = normalizedZoneId
+    ? 'ON CONFLICT (custom_column_id, kpi_item_id, zone_id, entry_date) WHERE zone_id IS NOT NULL'
+    : 'ON CONFLICT (custom_column_id, kpi_item_id, entry_date) WHERE zone_id IS NULL';
+  const { rows } = await pool.query(
+    `INSERT INTO custom_column_values (custom_column_id, kpi_item_id, zone_id, entry_date, value, updated_at)
+     VALUES ($1, $2, $3, $4, $5, now())
+     ${conflictClause}
+     DO UPDATE SET value = EXCLUDED.value, updated_at = now()
+     RETURNING *`,
+    [customColumnId, kpiItemId, normalizedZoneId, date, value ?? null]
+  );
+  const saved = rows[0];
+  return {
+    customColumnId: saved.custom_column_id,
+    kpiItemId: saved.kpi_item_id,
+    zoneId: saved.zone_id,
+    date: saved.entry_date,
+    value: saved.value === null ? null : Number(saved.value),
+  };
+}
+
 // Look up a kpi_item_id by (department, report_name) — case-insensitive, since
 // a human typing into a spreadsheet won't always match casing exactly.
 // scope, if given, narrows to 'common' or 'zone' (a department name is not
@@ -110,4 +135,4 @@ async function getFullSnapshot(date) {
   return rows;
 }
 
-module.exports = { deriveStatus, upsertEntry, findKpiItemId, findZoneId, getFullSnapshot };
+module.exports = { deriveStatus, upsertEntry, upsertCustomColumnValue, findKpiItemId, findZoneId, getFullSnapshot };

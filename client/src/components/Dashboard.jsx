@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
+import * as XLSX from 'xlsx';
 import { api } from '../api';
 import KpiTable from './KpiTable';
 import ZoneAnalyzer from './ZoneAnalyzer';
 import PrintLetterhead from './PrintLetterhead';
 import AnalyticsModal from './AnalyticsModal';
 import AddRowModal from './AddRowModal';
+import AddColumnModal from './AddColumnModal';
 import Navbar from './Navbar';
 import { buildCitywideRows } from '../lib/kpiHelpers';
 
@@ -15,6 +17,9 @@ function pad2(n) {
 function todayIso() {
   const d = new Date();
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+function toDdMmYyyy(iso) {
+  return iso.split('-').reverse().join('.'); // 2026-07-12 -> 12.07.2026
 }
 function reportGenLabels() {
   const now = new Date();
@@ -29,30 +34,37 @@ function reportGenLabels() {
 export default function Dashboard({ user, onLoggedOut }) {
   const [view, setView] = useState('overall'); // 'overall' | 'zone'
 
-  // The date the whole dashboard is currently showing/editing. Defaults to
-  // today's real date (fixing an earlier bug where a hardcoded 2026-07-12
-  // never matched the actual current date) and is now a genuine filter —
-  // changing it re-fetches both the common and zone-scoped rows for that
-  // date. Admin edits for a date with no existing entry simply create one
-  // (see upsertEntry on the server) — that's how "add a row for a new date"
-  // works, no separate machinery needed for it.
-  const [selectedDate, setSelectedDate] = useState(todayIso());
+  // FROM and TO are independently selectable (fixing an earlier bug where both
+  // fields were bound to one shared date and always moved together). A
+  // single-date view is just fromDate === toDate — the backend sums across
+  // whatever range is picked either way. Both default to today.
+  const [fromDate, setFromDate] = useState(todayIso());
+  const [toDate, setToDate] = useState(todayIso());
+  const isRange = fromDate !== toDate;
 
   const [commonRows, setCommonRows] = useState([]);
   const [loadingCommon, setLoadingCommon] = useState(true);
   const [error, setError] = useState('');
 
-  // Zone catalog (id/name) is static — fetched once. Zone rows are date-scoped
-  // and refetched whenever selectedDate changes.
+  // Zone catalog (id/name) is static — fetched once. Zone rows are date-range
+  // scoped and refetched whenever fromDate/toDate changes.
   const [zones, setZones] = useState([]);
   const [activeZoneId, setActiveZoneId] = useState(null);
   const [zoneRowsById, setZoneRowsById] = useState({});
   const [loadingZones, setLoadingZones] = useState(true);
   const zoneCatalogLoadedRef = useRef(false);
 
+  // Admin-defined custom metric columns (e.g. "Budget Allocated") — apply
+  // uniformly across every row, fetched once and re-fetched after any
+  // add/delete so every open table re-renders with the current set.
+  const [customColumns, setCustomColumns] = useState([]);
+  const customColumnsLoadedRef = useRef(false);
+
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [analyticsInfo, setAnalyticsInfo] = useState(null);
   const [showAddRow, setShowAddRow] = useState(false);
+  const [showAddColumn, setShowAddColumn] = useState(false);
 
   // Toggling this body class (rather than conditionally rendering the letterhead
   // itself) mirrors one.html's approach: the letterhead markup and CSS to hide
@@ -64,11 +76,11 @@ export default function Dashboard({ user, onLoggedOut }) {
     return () => document.body.classList.remove('force-letterhead');
   }, [isExportingPdf]);
 
-  async function loadCommon(date) {
+  async function loadCommon(from, to) {
     setLoadingCommon(true);
     setError('');
     try {
-      const data = await api.common(date);
+      const data = await api.common(from, to);
       setCommonRows(data);
     } catch (err) {
       setError(err.message);
@@ -77,11 +89,11 @@ export default function Dashboard({ user, onLoggedOut }) {
     }
   }
 
-  async function loadZoneRows(date, zoneList) {
+  async function loadZoneRows(from, to, zoneList) {
     setLoadingZones(true);
     setError('');
     try {
-      const results = await Promise.all(zoneList.map((z) => api.zoneItems(z.id, date)));
+      const results = await Promise.all(zoneList.map((z) => api.zoneItems(z.id, from, to)));
       const byId = {};
       zoneList.forEach((z, i) => {
         byId[z.id] = results[i];
@@ -91,6 +103,15 @@ export default function Dashboard({ user, onLoggedOut }) {
       setError(err.message);
     } finally {
       setLoadingZones(false);
+    }
+  }
+
+  async function loadCustomColumns() {
+    try {
+      const cols = await api.getColumns();
+      setCustomColumns(cols);
+    } catch (err) {
+      setError(err.message);
     }
   }
 
@@ -112,26 +133,53 @@ export default function Dashboard({ user, onLoggedOut }) {
       });
   }, []);
 
-  // Re-fetch common rows whenever the selected date changes.
   useEffect(() => {
-    loadCommon(selectedDate);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate]);
+    if (customColumnsLoadedRef.current) return;
+    customColumnsLoadedRef.current = true;
+    loadCustomColumns();
+  }, []);
 
-  // Re-fetch every zone's rows whenever the selected date changes, once the
-  // zone catalog itself has arrived.
+  // Re-fetch common rows whenever the selected date range changes.
+  useEffect(() => {
+    loadCommon(fromDate, toDate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fromDate, toDate]);
+
+  // Re-fetch every zone's rows whenever the selected date range changes, once
+  // the zone catalog itself has arrived.
   useEffect(() => {
     if (zones.length === 0) return;
-    loadZoneRows(selectedDate, zones);
+    loadZoneRows(fromDate, toDate, zones);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, zones]);
+  }, [fromDate, toDate, zones]);
+
+  function handleFromDateChange(value) {
+    if (!value) return;
+    setFromDate(value);
+    if (value > toDate) setToDate(value);
+  }
+
+  function handleToDateChange(value) {
+    if (!value) return;
+    setToDate(value);
+    if (value < fromDate) setFromDate(value);
+  }
 
   async function handleSaveCommon(payload) {
     const saved = await api.saveEntry(payload);
     setCommonRows((prev) =>
       prev.map((r) =>
         r.kpiItemId === payload.kpiItemId
-          ? { ...r, target: saved.target, achievement: saved.achievement, pending: saved.pending, performance: saved.performance, status: saved.status, note: saved.note }
+          ? {
+              ...r,
+              target: saved.target,
+              achievement: saved.achievement,
+              pending: saved.pending,
+              performance: saved.performance,
+              status: saved.status,
+              note: saved.note,
+              customValues: { ...r.customValues, ...saved.customValues },
+            }
           : r
       )
     );
@@ -145,7 +193,16 @@ export default function Dashboard({ user, onLoggedOut }) {
         ...prev,
         [payload.zoneId]: zoneRows.map((r) =>
           r.kpiItemId === payload.kpiItemId
-            ? { ...r, target: saved.target, achievement: saved.achievement, pending: saved.pending, performance: saved.performance, status: saved.status, note: saved.note }
+            ? {
+                ...r,
+                target: saved.target,
+                achievement: saved.achievement,
+                pending: saved.pending,
+                performance: saved.performance,
+                status: saved.status,
+                note: saved.note,
+                customValues: { ...r.customValues, ...saved.customValues },
+              }
             : r
         ),
       };
@@ -159,8 +216,32 @@ export default function Dashboard({ user, onLoggedOut }) {
   // than try to patch local state in a way that matches the server's reorder.
   async function handleAddRow(payload) {
     await api.addKpiItem(payload);
-    await loadCommon(selectedDate);
-    if (zones.length) await loadZoneRows(selectedDate, zones);
+    await loadCommon(fromDate, toDate);
+    if (zones.length) await loadZoneRows(fromDate, toDate, zones);
+  }
+
+  // Permanently removes a KPI parameter row (and, via ON DELETE CASCADE, all
+  // its logged entries across every date/zone). Irreversible — the confirm
+  // step lives in KpiTable right next to the button.
+  async function handleDeleteRow(kpiItemId) {
+    await api.deleteKpiItem(kpiItemId);
+    await loadCommon(fromDate, toDate);
+    if (zones.length) await loadZoneRows(fromDate, toDate, zones);
+  }
+
+  async function handleAddColumn(name) {
+    await api.addColumn(name);
+    await loadCustomColumns();
+  }
+
+  async function handleDeleteColumn(id) {
+    await api.deleteColumn(id);
+    await loadCustomColumns();
+    // Existing rows still carry the deleted column's id in their customValues
+    // map until the next fetch — a light re-fetch keeps things tidy, though
+    // KpiTable only ever renders columns still present in `customColumns`.
+    await loadCommon(fromDate, toDate);
+    if (zones.length) await loadZoneRows(fromDate, toDate, zones);
   }
 
   async function handleLogout() {
@@ -181,6 +262,10 @@ export default function Dashboard({ user, onLoggedOut }) {
     setAnalyticsInfo({ ...info, zoneName: activeZone?.name, zoneRows: activeZoneRows });
   }
 
+  function rangeSlug() {
+    return isRange ? `${fromDate}_to_${toDate}` : fromDate;
+  }
+
   async function handleDownloadPdf() {
     if (isExportingPdf) return;
     setError('');
@@ -195,7 +280,7 @@ export default function Dashboard({ user, onLoggedOut }) {
       const scopeSlug = view === 'zone' ? activeZone?.name || 'Zone' : 'Overall';
       const opt = {
         margin: 0.3,
-        filename: `CCMC_${scopeSlug}_KPI_Report_${selectedDate}.pdf`.replace(/\s+/g, '_'),
+        filename: `CCMC_${scopeSlug}_KPI_Report_${rangeSlug()}.pdf`.replace(/\s+/g, '_'),
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 3, useCORS: true },
         jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
@@ -209,7 +294,62 @@ export default function Dashboard({ user, onLoggedOut }) {
     }
   }
 
+  // Builds an .xlsx workbook of whichever report is currently on screen
+  // (Overall or the active Zone), respecting the selected date range and
+  // including any custom columns — a plain client-side export since every
+  // figure needed is already loaded into state.
+  function handleDownloadExcel() {
+    if (isExportingExcel) return;
+    setError('');
+    setIsExportingExcel(true);
+    try {
+      const rows = view === 'zone' ? activeZoneRows : overallRows;
+      const scopeLabel = view === 'zone' ? activeZone?.name || 'Zone' : 'Overall';
+      const header = [
+        'S.No',
+        'Department',
+        'Report / KPI Parameter',
+        'Target',
+        'Achievement',
+        'Pending',
+        'Performance %',
+        'Status',
+        ...customColumns.map((c) => c.name),
+      ];
+      const body = rows.map((r) => [
+        r.sno,
+        r.department,
+        r.reportName,
+        r.target ?? '',
+        r.achievement ?? '',
+        r.pending ?? '',
+        r.performance !== null && r.performance !== undefined ? `${(r.performance * 100).toFixed(2)}%` : '',
+        r.status ?? '',
+        ...customColumns.map((c) => (r.customValues ? r.customValues[c.id] ?? '' : '')),
+      ]);
+      const sheet = XLSX.utils.aoa_to_sheet([
+        [`CCMC – ${scopeLabel} KPI Report`],
+        [`Date range: ${toDdMmYyyy(fromDate)} – ${toDdMmYyyy(toDate)}`],
+        [],
+        header,
+        ...body,
+      ]);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, sheet, scopeLabel.slice(0, 31) || 'Report');
+      XLSX.writeFile(workbook, `CCMC_${scopeLabel}_KPI_Report_${rangeSlug()}.xlsx`.replace(/\s+/g, '_'));
+    } catch (err) {
+      setError(`Could not generate Excel file: ${err.message}`);
+    } finally {
+      setIsExportingExcel(false);
+    }
+  }
+
   const canEdit = user.role === 'admin';
+  // Editing a target/achievement/custom value writes to exactly one
+  // entry_date — that only makes sense when a single date is selected, not a
+  // multi-day aggregate. Row/column catalog changes (add/delete) aren't
+  // date-scoped, so those stay available to admin regardless of range.
+  const canEditValues = canEdit && !isRange;
   const activeZone = zones.find((z) => z.id === activeZoneId);
   const activeZoneRows = activeZoneId != null ? zoneRowsById[activeZoneId] || [] : [];
   // All 32+ KPIs for the Overall report: the real common (citywide) rows,
@@ -218,8 +358,9 @@ export default function Dashboard({ user, onLoggedOut }) {
   // aren't directly editable here.
   const overallRows = [...commonRows, ...buildCitywideRows(zones, zoneRowsById)];
   const loadingOverall = loadingCommon || (loadingZones && zones.length === 0);
-  const dateLabel = selectedDate.split('-').reverse().join('.'); // 2026-07-12 -> 12.07.2026
-  const isToday = selectedDate === todayIso();
+  const fromLabel = toDdMmYyyy(fromDate);
+  const toLabel = toDdMmYyyy(toDate);
+  const isToday = !isRange && fromDate === todayIso();
   const departmentNames = Array.from(new Set(overallRows.map((r) => r.department))).sort();
 
   return (
@@ -247,11 +388,11 @@ export default function Dashboard({ user, onLoggedOut }) {
             </h1>
             <div className="graphic-rule" />
             <div className="sheet-date">
-              DATE RANGE <b>{dateLabel} &ndash; {dateLabel}</b>
+              DATE RANGE <b>{fromLabel} &ndash; {toLabel}</b>
             </div>
           </>
         ) : (
-          <h1>Department-wise KPI &ndash; {selectedDate}</h1>
+          <h1>Department-wise KPI &ndash; {fromDate}{isRange ? ` to ${toDate}` : ''}</h1>
         )}
         {error && <p className="error-banner">{error}</p>}
 
@@ -270,34 +411,43 @@ export default function Dashboard({ user, onLoggedOut }) {
                 + Add Row
               </button>
             )}
+            {canEdit && (
+              <button type="button" className="add-col-btn" onClick={() => setShowAddColumn(true)}>
+                + Add Column
+              </button>
+            )}
             <button type="button" className="pdf-btn" onClick={handleDownloadPdf} disabled={isExportingPdf}>
               {isExportingPdf ? 'Preparing PDF…' : 'Download Report (PDF)'}
+            </button>
+            <button type="button" className="excel-btn" onClick={handleDownloadExcel} disabled={isExportingExcel}>
+              {isExportingExcel ? 'Preparing Excel…' : 'Download Report (Excel)'}
             </button>
           </div>
         </div>
 
-        {/* Date range filter — picks the date the whole dashboard reads/writes.
-            Both fields track the same date; true multi-day range aggregation
-            isn't supported yet, this is a single-date picker shown as a range
-            to match the original design. */}
+        {/* Date range filter — FROM and TO are now independently selectable.
+            A single date (from === to) is editable inline; a genuine
+            multi-day range shows the SUMmed target/achievement across those
+            days (read-only, since a sum isn't one entry to write back to). */}
         <div className="date-filter">
           <label htmlFor="filterFromDate">From</label>
           <input
             type="date"
             id="filterFromDate"
-            value={selectedDate}
-            onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
+            value={fromDate}
+            onChange={(e) => handleFromDateChange(e.target.value)}
           />
           <span className="to-sep">&ndash; To &ndash;</span>
           <input
             type="date"
             id="filterToDate"
-            value={selectedDate}
-            onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
+            value={toDate}
+            onChange={(e) => handleToDateChange(e.target.value)}
           />
           <span className="date-filter-note">
-            Showing figures for {dateLabel}. Pick any date to view it, or (as admin) log figures for it &mdash; entering a
-            target/achievement for a date with nothing logged yet creates that day's row.
+            {isRange
+              ? `Showing figures summed across ${fromLabel} – ${toLabel}. Select the same From and To date to edit figures inline.`
+              : `Showing figures for ${fromLabel}. Pick any date to view it, or (as admin) log figures for it — entering a target/achievement for a date with nothing logged yet creates that day's row.`}
           </span>
         </div>
 
@@ -307,16 +457,20 @@ export default function Dashboard({ user, onLoggedOut }) {
           ) : (
             <>
               <div className="zone-report-head">
-                <span className="zone-report-title">Department-wise KPI &ndash; {isToday ? 'today' : dateLabel}</span>
+                <span className="zone-report-title">Department-wise KPI &ndash; {isToday ? 'today' : isRange ? `${fromLabel} – ${toLabel}` : fromLabel}</span>
               </div>
               <KpiTable
                 rows={overallRows}
-                canEdit={canEdit}
+                canEdit={canEditValues}
+                canManageCatalog={canEdit}
                 onSave={handleSaveCommon}
+                onDeleteRow={handleDeleteRow}
                 zoneId={null}
-                date={selectedDate}
+                date={fromDate}
                 onViewAnalytics={handleViewAnalytics}
                 showDeptHeadings={false}
+                customColumns={customColumns}
+                onDeleteColumn={handleDeleteColumn}
               />
             </>
           ))}
@@ -333,10 +487,12 @@ export default function Dashboard({ user, onLoggedOut }) {
                 <KpiTable
                   rows={commonRows}
                   canEdit={false}
+                  canManageCatalog={false}
                   onSave={() => {}}
                   zoneId={null}
-                  date={selectedDate}
+                  date={fromDate}
                   onViewAnalytics={handleViewAnalytics}
+                  customColumns={customColumns}
                 />
               </div>
 
@@ -361,11 +517,15 @@ export default function Dashboard({ user, onLoggedOut }) {
                   <KpiTable
                     key={activeZone.id}
                     rows={activeZoneRows}
-                    canEdit={canEdit}
+                    canEdit={canEditValues}
+                    canManageCatalog={canEdit}
                     onSave={handleSaveZone}
+                    onDeleteRow={handleDeleteRow}
                     zoneId={activeZone.id}
-                    date={selectedDate}
+                    date={fromDate}
                     onViewAnalytics={handleViewZoneAnalytics}
+                    customColumns={customColumns}
+                    onDeleteColumn={handleDeleteColumn}
                   />
                 </>
               )}
@@ -373,10 +533,11 @@ export default function Dashboard({ user, onLoggedOut }) {
           ))}
       </main>
 
-      {analyticsInfo && <AnalyticsModal info={analyticsInfo} dateIso={selectedDate} onClose={() => setAnalyticsInfo(null)} />}
+      {analyticsInfo && <AnalyticsModal info={analyticsInfo} dateIso={toDate} onClose={() => setAnalyticsInfo(null)} />}
       {showAddRow && (
         <AddRowModal departments={departmentNames} onClose={() => setShowAddRow(false)} onSubmit={handleAddRow} />
       )}
+      {showAddColumn && <AddColumnModal onClose={() => setShowAddColumn(false)} onSubmit={handleAddColumn} />}
     </div>
   );
 }

@@ -1,13 +1,54 @@
 const express = require('express');
 const { pool } = require('../db');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
-const { deriveStatus, upsertEntry, getFullSnapshot } = require('../services/kpiStore');
+const { deriveStatus, upsertEntry, upsertCustomColumnValue, getFullSnapshot } = require('../services/kpiStore');
 const sheetsSync = require('../services/sheetsSync');
 
 const router = express.Router();
 
-function rowToKpi(row) {
+// `from`/`to` together define the date range a report view is currently
+// showing. Older callers that only ever knew about a single `date` still work
+// (from=to=date) — a range is the general case, a single day is just the
+// from===to special case of it.
+function getRange(req) {
+  const from = req.query.from || req.query.date || '2026-07-12';
+  const to = req.query.to || req.query.date || from;
+  return { from, to };
+}
+
+async function getCustomColumns() {
+  const { rows } = await pool.query('SELECT id, name FROM custom_columns ORDER BY id');
+  return rows;
+}
+
+// Sums each (kpi_item, custom_column) pair's values across the date range,
+// scoped to one zone (or the common/org-wide bucket when zoneId is null) —
+// same range-summing idea as the main target/achievement query below.
+async function getCustomValuesByItem({ zoneId, from, to }) {
+  const zoneClause = zoneId ? 'zone_id = $3' : 'zone_id IS NULL';
+  const params = zoneId ? [from, to, zoneId] : [from, to];
+  const { rows } = await pool.query(
+    `SELECT kpi_item_id, custom_column_id, SUM(value) AS value
+     FROM custom_column_values
+     WHERE ${zoneClause} AND entry_date BETWEEN $1 AND $2
+     GROUP BY kpi_item_id, custom_column_id`,
+    params
+  );
+  const map = new Map();
+  for (const r of rows) {
+    if (!map.has(r.kpi_item_id)) map.set(r.kpi_item_id, {});
+    map.get(r.kpi_item_id)[r.custom_column_id] = r.value === null ? null : Number(r.value);
+  }
+  return map;
+}
+
+function rowToKpi(row, customColumns, customValuesByItem) {
   const { pending, performance, status } = deriveStatus(row.target, row.achievement);
+  const customValues = {};
+  const valuesForItem = customValuesByItem.get(row.kpi_item_id) || {};
+  for (const col of customColumns) {
+    customValues[col.id] = valuesForItem[col.id] ?? null;
+  }
   return {
     kpiItemId: row.kpi_item_id,
     sno: row.sno,
@@ -20,6 +61,7 @@ function rowToKpi(row) {
     performance,
     status,
     note: row.note || '',
+    customValues,
   };
 }
 
@@ -29,35 +71,80 @@ router.get('/zones', requireAuth, async (req, res) => {
   res.json(rows);
 });
 
-// org-wide (common) KPI rows for a given date (defaults to the one seeded date)
-router.get('/common', requireAuth, async (req, res) => {
-  const date = req.query.date || '2026-07-12';
-  const { rows } = await pool.query(
-    `SELECT ki.id AS kpi_item_id, ki.sno, ki.department, ki.report_name, ki.unit,
-            ke.target, ke.achievement, ke.note
-     FROM kpi_items ki
-     LEFT JOIN kpi_entries ke ON ke.kpi_item_id = ki.id AND ke.zone_id IS NULL AND ke.entry_date = $1
-     WHERE ki.scope = 'common'
-     ORDER BY ki.sno`,
-    [date]
-  );
-  res.json(rows.map(rowToKpi));
+// custom (admin-defined) extra metric columns
+router.get('/columns', requireAuth, async (req, res) => {
+  res.json(await getCustomColumns());
 });
 
-// zone-scoped KPI rows for a given zone + date
+router.post('/columns', requireAuth, requireAdmin, async (req, res) => {
+  const { name } = req.body || {};
+  if (!name?.trim()) {
+    return res.status(400).json({ error: 'name is required.' });
+  }
+  try {
+    const { rows } = await pool.query('INSERT INTO custom_columns (name) VALUES ($1) RETURNING id, name', [name.trim()]);
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(400).json({ error: 'A column with that name already exists.' });
+    }
+    console.error('POST /kpi/columns failed:', err.message);
+    res.status(500).json({ error: 'Could not create the column.' });
+  }
+});
+
+router.delete('/columns/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { rowCount } = await pool.query('DELETE FROM custom_columns WHERE id = $1', [req.params.id]);
+    if (rowCount === 0) return res.status(404).json({ error: 'Column not found.' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('DELETE /kpi/columns/:id failed:', err.message);
+    res.status(500).json({ error: 'Could not delete the column.' });
+  }
+});
+
+// org-wide (common) KPI rows for a date range (from===to for a single day).
+// Figures are SUMmed across every date in the range — a LEFT JOIN would only
+// ever match one row per item for a single date, but for a genuine multi-day
+// range each item can have several kpi_entries rows, so this always aggregates
+// via GROUP BY (which degrades to "the one row" when the range is one day).
+router.get('/common', requireAuth, async (req, res) => {
+  const { from, to } = getRange(req);
+  const { rows } = await pool.query(
+    `SELECT ki.id AS kpi_item_id, ki.sno, ki.department, ki.report_name, ki.unit,
+            SUM(ke.target) AS target, SUM(ke.achievement) AS achievement,
+            CASE WHEN COUNT(ke.note) = 1 THEN MAX(ke.note) ELSE '' END AS note
+     FROM kpi_items ki
+     LEFT JOIN kpi_entries ke ON ke.kpi_item_id = ki.id AND ke.zone_id IS NULL AND ke.entry_date BETWEEN $1 AND $2
+     WHERE ki.scope = 'common'
+     GROUP BY ki.id, ki.sno, ki.department, ki.report_name, ki.unit
+     ORDER BY ki.sno`,
+    [from, to]
+  );
+  const customColumns = await getCustomColumns();
+  const customValuesByItem = await getCustomValuesByItem({ zoneId: null, from, to });
+  res.json(rows.map((r) => rowToKpi(r, customColumns, customValuesByItem)));
+});
+
+// zone-scoped KPI rows for a zone + date range — same range-SUM approach as /common.
 router.get('/zone/:zoneId', requireAuth, async (req, res) => {
-  const date = req.query.date || '2026-07-12';
+  const { from, to } = getRange(req);
   const { zoneId } = req.params;
   const { rows } = await pool.query(
     `SELECT ki.id AS kpi_item_id, ki.sno, ki.department, ki.report_name, ki.unit,
-            ke.target, ke.achievement, ke.note
+            SUM(ke.target) AS target, SUM(ke.achievement) AS achievement,
+            CASE WHEN COUNT(ke.note) = 1 THEN MAX(ke.note) ELSE '' END AS note
      FROM kpi_items ki
-     LEFT JOIN kpi_entries ke ON ke.kpi_item_id = ki.id AND ke.zone_id = $2 AND ke.entry_date = $1
+     LEFT JOIN kpi_entries ke ON ke.kpi_item_id = ki.id AND ke.zone_id = $3 AND ke.entry_date BETWEEN $1 AND $2
      WHERE ki.scope = 'zone'
+     GROUP BY ki.id, ki.sno, ki.department, ki.report_name, ki.unit
      ORDER BY ki.sno`,
-    [date, zoneId]
+    [from, to, zoneId]
   );
-  res.json(rows.map(rowToKpi));
+  const customColumns = await getCustomColumns();
+  const customValuesByItem = await getCustomValuesByItem({ zoneId, from, to });
+  res.json(rows.map((r) => rowToKpi(r, customColumns, customValuesByItem)));
 });
 
 const VALID_UNITS = ['Nos', 'MT', 'Rs'];
@@ -134,6 +221,7 @@ router.post('/items', requireAuth, requireAdmin, async (req, res) => {
       performance: null,
       status: null,
       note: '',
+      customValues: {},
     });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -148,15 +236,50 @@ router.post('/items', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-// upsert a single day's target/achievement/note for one KPI item (+ optional zone). Admin only —
-// Commissioner is deliberately read-only, matching the original dashboard's role split.
+// Admin-only: permanently remove a KPI parameter (and, via ON DELETE CASCADE,
+// every date/zone's logged figures and custom-column values for it). This is
+// a hard delete with no undo — the client confirms with the admin before
+// calling this.
+router.delete('/items/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { rowCount } = await pool.query('DELETE FROM kpi_items WHERE id = $1', [req.params.id]);
+    if (rowCount === 0) return res.status(404).json({ error: 'KPI row not found.' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('DELETE /kpi/items/:id failed:', err.message);
+    res.status(500).json({ error: 'Could not delete the row.' });
+  }
+});
+
+// upsert a single day's target/achievement/note (+ any custom column values)
+// for one KPI item (+ optional zone). Admin only — Commissioner is
+// deliberately read-only, matching the original dashboard's role split.
 router.put('/entry', requireAuth, requireAdmin, async (req, res) => {
-  const { kpiItemId, zoneId, date, target, achievement, note } = req.body || {};
+  const { kpiItemId, zoneId, date, target, achievement, note, customValues } = req.body || {};
   if (!kpiItemId || !date) {
     return res.status(400).json({ error: 'kpiItemId and date are required.' });
   }
   const saved = await upsertEntry({ kpiItemId, zoneId, date, target, achievement, note });
-  res.json(saved);
+
+  // Custom column values save alongside the main entry, one upsert per
+  // column. A single column's value failing to save shouldn't fail the whole
+  // row save — the target/achievement figures (the important part) are
+  // already committed by upsertEntry above by the time this loop runs.
+  const savedCustomValues = {};
+  if (customValues && typeof customValues === 'object') {
+    for (const [colIdStr, val] of Object.entries(customValues)) {
+      const colId = Number(colIdStr);
+      if (!Number.isFinite(colId)) continue;
+      try {
+        const savedVal = await upsertCustomColumnValue({ customColumnId: colId, kpiItemId, zoneId, date, value: val });
+        savedCustomValues[colId] = savedVal.value;
+      } catch (err) {
+        console.error(`Custom column ${colId} value save failed:`, err.message);
+      }
+    }
+  }
+
+  res.json({ ...saved, customValues: savedCustomValues });
 
   // Best-effort push to Google Sheets, if configured — never let a Sheets
   // hiccup fail or delay the actual save, which is why this happens after

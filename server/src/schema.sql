@@ -56,3 +56,35 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_kpi_entries_common
 
 CREATE INDEX IF NOT EXISTS idx_kpi_entries_date ON kpi_entries(entry_date);
 CREATE INDEX IF NOT EXISTS idx_kpi_entries_item ON kpi_entries(kpi_item_id);
+
+-- Admin-defined extra metric columns, layered on top of the fixed
+-- Target/Achievement/Pending/Performance/Status set (those stay fixed in code
+-- since deriveStatus's formula depends on exactly those two stored numbers).
+-- A custom column applies uniformly across every row/zone/date — e.g. an
+-- admin could add "Budget Allocated" and every KPI row gets an editable cell
+-- for it, same as target/achievement.
+CREATE TABLE IF NOT EXISTS custom_columns (
+  id         SERIAL PRIMARY KEY,
+  name       TEXT UNIQUE NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- One value per (custom column, kpi item, zone, date) — mirrors kpi_entries'
+-- shape (zone_id NULL = common/org-wide) so the same date-range SUM and
+-- zone_id-NULL upsert conventions apply here too.
+CREATE TABLE IF NOT EXISTS custom_column_values (
+  id               SERIAL PRIMARY KEY,
+  custom_column_id INTEGER NOT NULL REFERENCES custom_columns(id) ON DELETE CASCADE,
+  kpi_item_id      INTEGER NOT NULL REFERENCES kpi_items(id) ON DELETE CASCADE,
+  zone_id          INTEGER REFERENCES zones(id) ON DELETE CASCADE,
+  entry_date       DATE NOT NULL,
+  value            NUMERIC,
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_custom_col_values_zone
+  ON custom_column_values (custom_column_id, kpi_item_id, zone_id, entry_date) WHERE zone_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_custom_col_values_common
+  ON custom_column_values (custom_column_id, kpi_item_id, entry_date) WHERE zone_id IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_custom_col_values_col ON custom_column_values(custom_column_id);
