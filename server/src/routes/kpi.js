@@ -60,6 +60,94 @@ router.get('/zone/:zoneId', requireAuth, async (req, res) => {
   res.json(rows.map(rowToKpi));
 });
 
+const VALID_UNITS = ['Nos', 'MT', 'Rs'];
+
+// Admin-only: define a brand-new KPI parameter (a new table row) that doesn't
+// exist in the seeded catalog yet — e.g. a new report the department has
+// started tracking. scope='zone' means every zone gets its own editable entry
+// for this item (like Sanitation Workers' Attendance); scope='common' means a
+// single org-wide figure (like the 4 existing Public Health rows).
+//
+// The new item is inserted right after the last existing row of the same
+// department (same scope) so it lands in that department's heading group
+// instead of at the very end of the table — everything at or after that sno
+// shifts up by one to make room. Both the shift and the insert happen in one
+// transaction so a crash mid-way can't leave two rows sharing an sno.
+router.post('/items', requireAuth, requireAdmin, async (req, res) => {
+  const { department, reportName, unit, scope } = req.body || {};
+  if (!department?.trim() || !reportName?.trim() || !unit || !scope) {
+    return res.status(400).json({ error: 'department, reportName, unit and scope are required.' });
+  }
+  if (!VALID_UNITS.includes(unit)) {
+    return res.status(400).json({ error: `unit must be one of: ${VALID_UNITS.join(', ')}` });
+  }
+  if (!['common', 'zone'].includes(scope)) {
+    return res.status(400).json({ error: "scope must be 'common' or 'zone'." });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows: deptRows } = await client.query(
+      `SELECT MAX(sno) AS max_sno FROM kpi_items WHERE scope = $1 AND lower(department) = lower($2)`,
+      [scope, department.trim()]
+    );
+    const { rows: scopeRows } = await client.query(`SELECT MAX(sno) AS max_sno FROM kpi_items WHERE scope = $1`, [scope]);
+    const deptMaxSno = deptRows[0]?.max_sno;
+    const scopeMaxSno = scopeRows[0]?.max_sno ?? 0;
+    // If the department already has rows in this scope, insert right after them;
+    // otherwise (a brand-new department name) just append at the end of the scope.
+    const insertSno = (deptMaxSno ?? scopeMaxSno) + 1;
+
+    // Shifting sno values up by one to make room can't be done as a single
+    // `SET sno = sno + 1` pass: Postgres checks the UNIQUE(sno, scope) index
+    // per row even within one UPDATE statement (it's not deferred to the end
+    // of the statement), so e.g. row 17 moving to 18 collides with the
+    // not-yet-updated row already sitting at 18. Negating first moves every
+    // affected row out of the way into distinct, never-colliding negative
+    // values, then the second pass restores them (+1) into the now-empty
+    // slots — order-independent, so this is safe regardless of scan order.
+    await client.query(`UPDATE kpi_items SET sno = -sno WHERE scope = $1 AND sno >= $2`, [scope, insertSno]);
+    await client.query(`UPDATE kpi_items SET sno = -sno + 1 WHERE scope = $1 AND sno < 0`, [scope]);
+
+    const { rows } = await client.query(
+      `INSERT INTO kpi_items (sno, department, report_name, unit, scope)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, sno, department, report_name, unit, scope`,
+      [insertSno, department.trim(), reportName.trim(), unit, scope]
+    );
+
+    await client.query('COMMIT');
+
+    const item = rows[0];
+    res.status(201).json({
+      kpiItemId: item.id,
+      sno: item.sno,
+      department: item.department,
+      reportName: item.report_name,
+      unit: item.unit,
+      scope: item.scope,
+      target: null,
+      achievement: null,
+      pending: null,
+      performance: null,
+      status: null,
+      note: '',
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    // Respond directly rather than re-throwing: this is Express 4, which does
+    // NOT catch rejected promises from async handlers — an uncaught rejection
+    // here would hang the request and, on newer Node defaults, crash the
+    // whole process instead of just failing this one save.
+    console.error('POST /kpi/items failed:', err.message);
+    res.status(500).json({ error: 'Could not save the new KPI row.' });
+  } finally {
+    client.release();
+  }
+});
+
 // upsert a single day's target/achievement/note for one KPI item (+ optional zone). Admin only —
 // Commissioner is deliberately read-only, matching the original dashboard's role split.
 router.put('/entry', requireAuth, requireAdmin, async (req, res) => {

@@ -27,4 +27,5 @@ export const api = {
   common: (date) => request(`/kpi/common?date=${date}`),
   zoneItems: (zoneId, date) => request(`/kpi/zone/${zoneId}?date=${date}`),
   saveEntry: (payload) => request('/kpi/entry', { method: 'PUT', body: JSON.stringify(payload) }),
+  addKpiItem: (payload) => request('/kpi/items', { method: 'POST', body: JSON.stringify(payload) }),
 };
