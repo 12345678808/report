@@ -6,29 +6,7 @@
 // since the existing GET /api/kpi/zone/:zoneId already returns everything
 // needed per row.
 
-import { computeZoneStats, fmtNum, tierChartColor, tierFromStatus } from '../lib/kpiHelpers';
-
-// Only the paired target/achievement figures are shown here — a unit with
-// achievement logged but no comparable target isn't shown as a lone number,
-// since without a target it can't be read as progress toward anything.
-function metricLine(label, u) {
-  if (!u.hasPaired) {
-    return (
-      <div className="za-metric-row" key={label}>
-        <span>{label}:</span>
-        <b>—</b>
-      </div>
-    );
-  }
-  return (
-    <div className="za-metric-row" key={label}>
-      <span>{label}:</span>
-      <b>
-        {fmtNum(u.pAch)} / {fmtNum(u.pTgt)}
-      </b>
-    </div>
-  );
-}
+import { computeZoneStats, tierChartColor, tierFromStatus } from '../lib/kpiHelpers';
 
 export default function ZoneAnalyzer({ zones, rowsByZoneId, asOfDate }) {
   return (
@@ -43,7 +21,6 @@ export default function ZoneAnalyzer({ zones, rowsByZoneId, asOfDate }) {
           </div>
           <div>
             <span className="za-badge-pill">Live Zone Analyzer</span>
-            <div className="za-title">All Municipal Departments</div>
             <p className="za-subtitle">
               Zone-wise KPI performance across North, South, East, West &amp; Central — SWM, Engineering, Revenue &amp;
               Grievances.
@@ -55,7 +32,7 @@ export default function ZoneAnalyzer({ zones, rowsByZoneId, asOfDate }) {
       <div className="za-cards">
         {zones.map((zone) => {
           const rows = rowsByZoneId[zone.id] || [];
-          const { units, pct } = computeZoneStats(rows);
+          const { pct } = computeZoneStats(rows);
           // A zone item's own `status` (computed by the backend per-row from
           // that row's own target/achievement) isn't the same as the zone's
           // aggregate tier — re-derive the tier from the aggregate pct so the
@@ -80,11 +57,6 @@ export default function ZoneAnalyzer({ zones, rowsByZoneId, asOfDate }) {
               <div className="za-pct-label">Zone Efficiency</div>
               <div className="za-bar-track">
                 <div className="za-bar-fill" style={{ width: `${barWidth}%`, background: color }} />
-              </div>
-              <div className="za-metrics">
-                {metricLine('Nos', units.Nos)}
-                {metricLine('MT', units.MT)}
-                {metricLine('Rs', units.Rs)}
               </div>
             </div>
           );

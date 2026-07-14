@@ -82,6 +82,10 @@ body{ background: var(--paper); color: var(--ink); }
 .navbar-bell{ position:relative; }
 .navbar-bell .bell-dot{ position:absolute;top:5px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--red);border:1.5px solid #fff; }
 
+.page-heading{ text-align:center;padding:14px 24px 0; }
+.page-heading-title{ font-size:16px;font-weight:bold;color:var(--navy);margin:0 0 3px; }
+.page-heading-sub{ font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.5px;margin:0; }
+
 .sheet-wrap{ max-width:1100px;margin:24px auto 60px;padding:24px;background:#fff;border-radius:14px;box-shadow:0 4px 20px rgba(18,42,67,0.08); }
 .sheet-wrap h1{ font-size:18px;color:var(--navy);margin:0 0 16px; }
 .error-banner{ background:#FBE9E9;color:var(--red);padding:10px 14px;border-radius:8px;font-size:13px; }
@@ -182,7 +186,8 @@ body.force-letterhead .control-bar,
 body.force-letterhead .zone-chips,
 body.force-letterhead .edit-col,
 body.force-letterhead .analytics-col,
-body.force-letterhead .analytics-cell{ display:none !important; }
+body.force-letterhead .analytics-cell,
+body.force-letterhead .page-heading{ display:none !important; }
 body.force-letterhead .sheet-wrap{ box-shadow:none; }
 body.force-letterhead table.kpi-table{ table-layout:fixed;font-size:12px; }
 body.force-letterhead .kpi-table thead th{ word-break:break-word;overflow-wrap:break-word;white-space:normal;font-size:10.5px;padding:8px 6px; }
@@ -194,11 +199,7 @@ body.force-letterhead .za-card{ padding:10px 8px 9px;min-width:0;overflow:hidden
 body.force-letterhead .za-zone-name{ font-size:9px;letter-spacing:0.2px; }
 body.force-letterhead .za-pct{ font-size:19px; }
 body.force-letterhead .za-pct-label{ font-size:8px;margin:1px 0 7px; }
-body.force-letterhead .za-metrics{ font-size:9px; }
 body.force-letterhead .za-tier-label{ font-size:8px; }
-body.force-letterhead .za-metric-row{ flex-wrap:wrap;row-gap:1px; }
-body.force-letterhead .za-metric-row span,
-body.force-letterhead .za-metric-row b{ white-space:normal;word-break:break-word;min-width:0; }
 body.force-letterhead .zone-analyzer{ box-shadow:none; }
 
 /* ---------- view tabs (Overall report / Zone report) ---------- */
@@ -214,8 +215,7 @@ body.force-letterhead .zone-analyzer{ box-shadow:none; }
 .za-icon{ width:38px;height:38px;border-radius:10px;background:rgba(200,155,60,0.14);border:1px solid rgba(200,155,60,0.4);display:flex;align-items:center;justify-content:center;flex:0 0 auto; }
 .za-icon svg{ width:20px;height:20px;stroke:#9C7A28; }
 .za-badge-pill{ display:inline-block;font-size:10px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:#9C7A28;background:rgba(200,155,60,0.14);border:1px solid rgba(200,155,60,0.35);border-radius:20px;padding:3px 10px;margin-bottom:6px; }
-.za-title{ font-family:Georgia,'Times New Roman',serif;font-size:19px;font-weight:bold;color:var(--navy);margin:0 0 3px; }
-.za-subtitle{ font-size:11.5px;color:var(--ink-soft);margin:0; }
+.za-subtitle{ font-size:11.5px;color:var(--ink-soft);margin:6px 0 0; }
 .za-asof{ font-size:10.5px;color:var(--ink-soft);background:rgba(11,29,48,0.04);border:1px solid rgba(11,29,48,0.10);border-radius:8px;padding:6px 12px;white-space:nowrap; }
 .za-cards{ display:grid;grid-template-columns:repeat(5, minmax(0, 1fr));gap:14px; }
 .za-card{ position:relative;background:linear-gradient(180deg, var(--za-tint, #ffffff) 0%, #ffffff 60%);border:1px solid var(--sky-line);border-top:3px solid var(--za-tier, var(--sky-line));border-radius:12px;padding:16px 16px 14px;box-shadow:0 2px 10px rgba(18,42,67,0.06); }
@@ -228,11 +228,6 @@ body.force-letterhead .zone-analyzer{ box-shadow:none; }
 .za-pct-label{ font-size:10px;font-weight:bold;letter-spacing:0.8px;text-transform:uppercase;color:var(--ink-soft);margin:1px 0 10px; }
 .za-bar-track{ width:100%;height:6px;border-radius:6px;background:var(--sky);overflow:hidden;margin-bottom:13px; }
 .za-bar-fill{ height:100%;border-radius:6px; }
-.za-metrics{ font-size:11.5px;border-top:1px solid var(--sky-line);padding-top:9px; }
-.za-metric-row{ display:flex;justify-content:space-between;gap:6px;padding:2.5px 0;color:var(--ink); }
-.za-metric-row span:first-child{ color:var(--ink-soft); }
-.za-metric-row b{ font-weight:bold;color:var(--navy);font-variant-numeric:tabular-nums; }
-.za-metric-extra{ color:#8FA0B3; }
 
 /* ---------- zone chips + zone report header ---------- */
 .zone-common-block{ margin-bottom:26px;padding:16px 18px 18px;background:var(--gold-light);border:1px solid var(--gold-line);border-radius:12px; }
@@ -275,6 +270,8 @@ body.force-letterhead .zone-analyzer{ box-shadow:none; }
   body{ padding:0; }
   .login-card{ padding:20px 18px 18px; }
   .login-title{ font-size:14.5px; }
+  .page-heading-title{ font-size:13.5px; }
+  .page-heading-sub{ font-size:9.5px; }
   .navbar-org{ font-size:12.5px; }
   .navbar-sub, .navbar-report-label{ font-size:8.5px; }
   .navbar-user-text{ display:none; }

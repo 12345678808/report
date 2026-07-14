@@ -205,6 +205,11 @@ export default function Dashboard({ user, onLoggedOut }) {
     <div className="dashboard">
       <Navbar user={user} onLogout={handleLogout} />
 
+      <div className="page-heading">
+        <p className="page-heading-title">CCMC &ndash; Commissioner's Daily Review</p>
+        <p className="page-heading-sub">Department-wise KPI Master Register</p>
+      </div>
+
       <main className="sheet-wrap">
         <PrintLetterhead
           scopeLabel={view === 'zone' ? activeZone?.name || 'Zone' : 'Overall'}
@@ -232,14 +237,17 @@ export default function Dashboard({ user, onLoggedOut }) {
           (loadingOverall ? (
             <p>Loading…</p>
           ) : (
-            <KpiTable
-              rows={overallRows}
-              canEdit={canEdit}
-              onSave={handleSaveCommon}
-              zoneId={null}
-              date={DATE}
-              onViewAnalytics={handleViewAnalytics}
-            />
+            <>
+              <ZoneAnalyzer zones={zones} rowsByZoneId={zoneRowsById} asOfDate={DATE.split('-').reverse().join('.')} />
+              <KpiTable
+                rows={overallRows}
+                canEdit={canEdit}
+                onSave={handleSaveCommon}
+                zoneId={null}
+                date={DATE}
+                onViewAnalytics={handleViewAnalytics}
+              />
+            </>
           ))}
 
         {view === 'zone' &&
