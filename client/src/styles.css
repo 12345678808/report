@@ -82,13 +82,21 @@ body{ background: var(--paper); color: var(--ink); }
 .navbar-bell{ position:relative; }
 .navbar-bell .bell-dot{ position:absolute;top:5px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--red);border:1.5px solid #fff; }
 
-.page-heading{ text-align:center;padding:14px 24px 0; }
-.page-heading-title{ font-size:16px;font-weight:bold;color:var(--navy);margin:0 0 3px; }
-.page-heading-sub{ font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.5px;margin:0; }
-
 .sheet-wrap{ max-width:1100px;margin:24px auto 60px;padding:24px;background:#fff;border-radius:14px;box-shadow:0 4px 20px rgba(18,42,67,0.08); }
 .sheet-wrap h1{ font-size:18px;color:var(--navy);margin:0 0 16px; }
 .error-banner{ background:#FBE9E9;color:var(--red);padding:10px 14px;border-radius:8px;font-size:13px; }
+
+/* ---------- Overall report's letterhead-style heading + demo date-range
+   filter (ported from one.html's on-screen sheet-header) — Overall tab only */
+.overall-letterhead-title{ font-family:Georgia,'Times New Roman',serif;font-size:21px;font-weight:bold;margin:0 0 4px;color:var(--navy);letter-spacing:0.2px;text-align:center; }
+.graphic-rule{ height:5px;border-radius:5px;background:linear-gradient(90deg, var(--navy) 0%, var(--steel) 35%, var(--gold) 70%, rgba(200,155,60,0) 100%);margin:10px 0 22px; }
+.sheet-date{ display:flex;justify-content:flex-end;font-size:13px;color:var(--ink-soft);margin:10px 0 4px; }
+.sheet-date b{ color:var(--navy);margin-left:6px;background:var(--gold-light);border:1px solid var(--gold-line);padding:3px 10px;border-radius:6px; }
+.date-filter{ display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 18px; }
+.date-filter label{ font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-soft); }
+.date-filter input[type="date"]{ padding:7px 9px;border:1px solid var(--sky-line);border-radius:6px;font-size:12.5px;background:#fff;color:var(--ink); }
+.date-filter .to-sep{ font-size:11px;color:var(--ink-soft);font-weight:bold;padding:0 2px; }
+.date-filter-note{ width:100%;font-size:11px;color:var(--ink-soft);margin-top:4px; }
 
 table.kpi-table{ width:100%;border-collapse:separate;border-spacing:0;font-size:13px; }
 .kpi-table thead th{ background:linear-gradient(180deg,var(--steel),var(--navy));color:#fff;padding:10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.3px; }
@@ -183,11 +191,11 @@ body.force-letterhead .print-letterhead-wrap{ display:block; }
    capturing .sheet-wrap. Hides on-screen-only controls that aren't
    clickable in a PDF and swaps in the letterhead above (via .print-letterhead-wrap). ---------- */
 body.force-letterhead .control-bar,
+body.force-letterhead .date-filter,
 body.force-letterhead .zone-chips,
 body.force-letterhead .edit-col,
 body.force-letterhead .analytics-col,
-body.force-letterhead .analytics-cell,
-body.force-letterhead .page-heading{ display:none !important; }
+body.force-letterhead .analytics-cell{ display:none !important; }
 body.force-letterhead .sheet-wrap{ box-shadow:none; }
 body.force-letterhead table.kpi-table{ table-layout:fixed;font-size:12px; }
 body.force-letterhead .kpi-table thead th{ word-break:break-word;overflow-wrap:break-word;white-space:normal;font-size:10.5px;padding:8px 6px; }
@@ -262,6 +270,10 @@ body.force-letterhead .zone-analyzer{ box-shadow:none; }
   .za-pct{ font-size:22px; }
   .zone-chips{ gap:6px; }
   .zone-chip{ padding:7px 14px;font-size:11.5px; }
+  .overall-letterhead-title{ font-size:16px; }
+  .sheet-date{ justify-content:flex-start;text-align:left; }
+  .date-filter{ width:100%;justify-content:flex-start; }
+  .date-filter input[type="date"]{ flex:1;min-width:0; }
 }
 
 @media (max-width: 480px){
@@ -270,8 +282,7 @@ body.force-letterhead .zone-analyzer{ box-shadow:none; }
   body{ padding:0; }
   .login-card{ padding:20px 18px 18px; }
   .login-title{ font-size:14.5px; }
-  .page-heading-title{ font-size:13.5px; }
-  .page-heading-sub{ font-size:9.5px; }
+  .overall-letterhead-title{ font-size:14px; }
   .navbar-org{ font-size:12.5px; }
   .navbar-sub, .navbar-report-label{ font-size:8.5px; }
   .navbar-user-text{ display:none; }

@@ -29,8 +29,8 @@ export default function LoginPage({ onLoggedIn }) {
         <div className="seal">
           <CcmcSeal width={56} height={56} />
         </div>
-        <p className="login-title">CCMC &ndash; Commissioner's Daily Review</p>
-        <p className="login-sub">Department-wise KPI Master Register</p>
+        <p className="login-title">CCMC &ndash; Commissioner's Daily Review &ndash; Department-wise KPI Master Register</p>
+        <p className="login-sub">Coimbatore City Municipal Corporation</p>
 
         <div className="role-toggle">
           <button type="button" className={role === 'admin' ? 'active' : ''} onClick={() => setRole('admin')}>

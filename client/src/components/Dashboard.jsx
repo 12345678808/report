@@ -200,15 +200,11 @@ export default function Dashboard({ user, onLoggedOut }) {
   // aren't directly editable here.
   const overallRows = [...commonRows, ...buildCitywideRows(zones, zoneRowsById)];
   const loadingOverall = loadingCommon || (loadingZones && zones.length === 0);
+  const dateLabel = DATE.split('-').reverse().join('.'); // 2026-07-12 -> 12.07.2026
 
   return (
     <div className="dashboard">
       <Navbar user={user} onLogout={handleLogout} />
-
-      <div className="page-heading">
-        <p className="page-heading-title">CCMC &ndash; Commissioner's Daily Review</p>
-        <p className="page-heading-sub">Department-wise KPI Master Register</p>
-      </div>
 
       <main className="sheet-wrap">
         <PrintLetterhead
@@ -216,7 +212,26 @@ export default function Dashboard({ user, onLoggedOut }) {
           genDateLabel={reportGenLabels().dateLabel}
           genTimeLabel={reportGenLabels().timeLabel}
         />
-        <h1>Department-wise KPI &ndash; {DATE}</h1>
+
+        {/* The bigger letterhead-style heading + demo date-range filter (ported
+            from one.html's on-screen sheet-header/date-filter) is scoped to the
+            Overall report only, per an explicit request — the Zone report tab
+            keeps the plain heading it always had. */}
+        {view === 'overall' ? (
+          <>
+            <h1 className="overall-letterhead-title">
+              CCMC &ndash; Commissioner's Daily Review &ndash;
+              <br />
+              Department-wise KPI Master Register
+            </h1>
+            <div className="graphic-rule" />
+            <div className="sheet-date">
+              DATE RANGE <b>{dateLabel} &ndash; {dateLabel}</b>
+            </div>
+          </>
+        ) : (
+          <h1>Department-wise KPI &ndash; {DATE}</h1>
+        )}
         {error && <p className="error-banner">{error}</p>}
 
         <div className="control-bar">
@@ -233,12 +248,30 @@ export default function Dashboard({ user, onLoggedOut }) {
           </button>
         </div>
 
+        {/* Demo-only date range filter — ported from one.html for visual parity.
+            It doesn't refetch data (the MVP only has the one seeded DATE), so
+            it's read-only, same as the source file's "figures stay as entered
+            on the sheet" behavior. */}
+        {view === 'overall' && (
+          <div className="date-filter">
+            <label htmlFor="filterFromDate">From</label>
+            <input type="date" id="filterFromDate" value={DATE} readOnly />
+            <span className="to-sep">&ndash; To &ndash;</span>
+            <input type="date" id="filterToDate" value={DATE} readOnly />
+            <span className="date-filter-note">
+              Demo filter &mdash; changes the date range shown above; KPI figures stay as entered on the sheet.
+            </span>
+          </div>
+        )}
+
         {view === 'overall' &&
           (loadingOverall ? (
             <p>Loading…</p>
           ) : (
             <>
-              <ZoneAnalyzer zones={zones} rowsByZoneId={zoneRowsById} asOfDate={DATE.split('-').reverse().join('.')} />
+              <div className="zone-report-head">
+                <span className="zone-report-title">Department-wise KPI &ndash; today</span>
+              </div>
               <KpiTable
                 rows={overallRows}
                 canEdit={canEdit}
@@ -255,7 +288,7 @@ export default function Dashboard({ user, onLoggedOut }) {
             <p>Loading…</p>
           ) : (
             <>
-              <ZoneAnalyzer zones={zones} rowsByZoneId={zoneRowsById} asOfDate={DATE.split('-').reverse().join('.')} />
+              <ZoneAnalyzer zones={zones} rowsByZoneId={zoneRowsById} asOfDate={dateLabel} />
 
               <div className="zone-common-block">
                 <p className="zone-common-title">Common for all zones &ndash; Public Health</p>
