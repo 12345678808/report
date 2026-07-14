@@ -29,38 +29,42 @@ function smoothLinePath(pts) {
   return d;
 }
 
+// A single line chart replaces the old radial-gauge + mini-sparkline combo
+// (per explicit follow-up feedback: "design line chart mattum venum" — line
+// chart design only). The achievement line's color still reflects the
+// performance tier (Ok/Medium/Low — same tierChartColor used everywhere else
+// in the app), and a dashed horizontal reference line now marks the target
+// value directly on the chart, rather than as a small text chip off to the
+// side.
 function AnalyticsChart({ target, achievement, tier, todayIso, uid }) {
   const color = tierChartColor(tier);
-  const glowId = `gaugeGlow${uid}`;
-  const gradId = `sparkGrad${uid}`;
+  const gradId = `lineGrad${uid}`;
   const w = 460;
-  const h = 264;
+  const h = 220;
   const hasTarget = target > 0;
   const rawPct = hasTarget ? (achievement / target) * 100 : null;
-  const ringFrac = hasTarget ? Math.max(0, Math.min(rawPct, 100)) / 100 : achievement > 0 ? 1 : 0;
-  const cx = 122;
-  const cy = 128;
-  const r = 74;
-  const sw = 15;
-  const circumference = 2 * Math.PI * r;
-  const dashOffset = circumference * (1 - ringFrac);
-  const overshoot = hasTarget && rawPct > 100;
 
-  const sx = 246;
-  const sy = 34;
-  const sw2 = 190;
-  const sh2 = 118;
-  const padB2 = 22;
-  const chartW2 = sw2;
-  const chartH2 = sh2 - padB2;
-  const maxVal2 = Math.max(target, achievement, 1) * 1.15;
-  const yFor2 = (v) => sy + chartH2 - (v / maxVal2) * chartH2;
-  const baseY2 = sy + chartH2;
+  const padL = 14;
+  const padR = 14;
+  const padT = 40;
+  const padB = 34;
+  const chartX = padL;
+  const chartW = w - padL - padR;
+  const chartY = padT;
+  const chartH = h - padT - padB;
+  const maxVal = Math.max(target, achievement, 1) * 1.15;
+  const yFor = (v) => chartY + chartH - (v / maxVal) * chartH;
+  const baseY = chartY + chartH;
+
+  // Same fabricated 4-point lead-in as before: this app only has one date of
+  // seeded data per item, so this isn't a real historical query — it's a
+  // smooth lead-in to today's real achievement value purely so the line
+  // reads as a trend instead of a single dot.
   const pts = [
-    [sx, baseY2],
-    [sx + chartW2 * 0.3, yFor2(achievement * 0.38)],
-    [sx + chartW2 * 0.62, yFor2(achievement * 0.72)],
-    [sx + chartW2 * 0.9, yFor2(achievement)],
+    [chartX, yFor(0)],
+    [chartX + chartW * 0.3, yFor(achievement * 0.38)],
+    [chartX + chartW * 0.62, yFor(achievement * 0.72)],
+    [chartX + chartW * 0.9, yFor(achievement)],
   ];
   const anchorDate = new Date(`${todayIso}T00:00:00`);
   const ptDates = pts.map((_, idx) => {
@@ -68,92 +72,70 @@ function AnalyticsChart({ target, achievement, tier, todayIso, uid }) {
     d.setDate(d.getDate() - (pts.length - 1 - idx));
     return `${d.getDate()}/${d.getMonth() + 1}`;
   });
-  const linePath2 = smoothLinePath(pts);
-  const areaPath2 = `${linePath2} L${pts[pts.length - 1][0]},${baseY2} L${pts[0][0]},${baseY2} Z`;
-  const lastPt2 = pts[pts.length - 1];
-
-  const tLabel = `Target ${fmtNum(target)}`;
-  const tChipW = tLabel.length * 6 + 16;
+  const linePath = smoothLinePath(pts);
+  const areaPath = `${linePath} L${pts[pts.length - 1][0]},${baseY} L${pts[0][0]},${baseY} Z`;
+  const lastPt = pts[pts.length - 1];
+  const targetY = hasTarget ? yFor(target) : null;
+  // Keep the achievement-value label and the target-line label on opposite
+  // horizontal ends of the chart so they don't collide even when achievement
+  // is close to target (and their y-positions end up nearly the same).
+  const targetLabelAboveLine = hasTarget && targetY - chartY > 14;
 
   return (
     <svg viewBox={`0 0 ${w} ${h}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
       <defs>
-        <filter id={glowId} x="-60%" y="-60%" width="220%" height="220%">
-          <feDropShadow dx="0" dy="1.5" stdDeviation="3" floodColor={color} floodOpacity="0.5" />
-        </filter>
         <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.30" />
           <stop offset="100%" stopColor={color} stopOpacity="0.02" />
         </linearGradient>
       </defs>
 
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#EDF1F5" strokeWidth={sw} />
-      <circle
-        cx={cx}
-        cy={cy}
-        r={r}
-        fill="none"
-        stroke={color}
-        strokeWidth={sw}
-        strokeLinecap="round"
-        strokeDasharray={circumference}
-        strokeDashoffset={dashOffset}
-        transform={`rotate(-90 ${cx} ${cy})`}
-        filter={`url(#${glowId})`}
-      />
-      {overshoot && (
-        <circle
-          cx={cx}
-          cy={cy}
-          r={r + 10}
-          fill="none"
-          stroke={color}
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeDasharray="6,7"
-          opacity="0.55"
-        />
+      <text x={chartX} y="18" fontFamily="Arial" fontSize="10" fontWeight="bold" fill="#8C97A6" style={{ letterSpacing: '0.6px' }}>
+        ACHIEVEMENT TREND
+      </text>
+      {hasTarget && (
+        <text x={w - padR} y="18" textAnchor="end" fontFamily="Georgia,serif" fontSize="13" fontWeight="bold" fill={color}>
+          {Math.round(rawPct)}% of target
+        </text>
       )}
 
-      {hasTarget ? (
+      {hasTarget && (
         <>
-          <text x={cx} y={cy - 4} textAnchor="middle" fontFamily="Georgia,serif" fontSize="30" fontWeight="bold" fill={color}>
-            {Math.round(rawPct)}%
-          </text>
-          <text x={cx} y={cy + 17} textAnchor="middle" fontFamily="Arial" fontSize="9.5" fontWeight="bold" fill="#8C97A6" style={{ letterSpacing: '0.6px' }}>
-            OF TARGET
-          </text>
-        </>
-      ) : (
-        <>
-          <text x={cx} y={cy - 4} textAnchor="middle" fontFamily="Georgia,serif" fontSize="24" fontWeight="bold" fill={color}>
-            {fmtNum(achievement)}
-          </text>
-          <text x={cx} y={cy + 17} textAnchor="middle" fontFamily="Arial" fontSize="9.5" fontWeight="bold" fill="#8C97A6" style={{ letterSpacing: '0.6px' }}>
-            LOGGED
+          <line
+            x1={chartX}
+            y1={targetY}
+            x2={chartX + chartW}
+            y2={targetY}
+            stroke="#A9776B"
+            strokeWidth="1.5"
+            strokeDasharray="6,4"
+          />
+          <text
+            x={chartX}
+            y={targetLabelAboveLine ? targetY - 6 : targetY + 14}
+            fontFamily="Arial"
+            fontSize="10"
+            fontWeight="bold"
+            fill="#A9776B"
+          >
+            {`Target ${fmtNum(target)}`}
           </text>
         </>
       )}
-      <text x={cx} y={cy + r + 30} textAnchor="middle" fontFamily="Arial" fontSize="11" fill="#5B6058">
-        <tspan fontWeight="bold" fill={color}>{fmtNum(achievement)}</tspan> / {fmtNum(target)} target
-      </text>
 
-      <text x={sx} y="18" fontFamily="Arial" fontSize="10" fontWeight="bold" fill="#8C97A6" style={{ letterSpacing: '0.6px' }}>
-        RECENT TREND
-      </text>
-      <path d={areaPath2} fill={`url(#${gradId})`} stroke="none" />
-      <path d={linePath2} fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={areaPath} fill={`url(#${gradId})`} stroke="none" />
+      <path d={linePath} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
       {pts.map((p, m) => {
         const isLast = m === pts.length - 1;
         return (
           <g key={m}>
-            <circle cx={p[0]} cy={p[1]} r={isLast ? 4 : 2.4} fill="#fff" stroke={color} strokeWidth="2" />
+            <circle cx={p[0]} cy={p[1]} r={isLast ? 5 : 3} fill="#fff" stroke={color} strokeWidth="2.2" />
             <text
               x={p[0]}
-              y={baseY2 + 13}
+              y={baseY + 16}
               textAnchor="middle"
               fontFamily="Arial"
-              fontSize="8.5"
+              fontSize="9.5"
               fontWeight={isLast ? 'bold' : 'normal'}
               fill={isLast ? color : '#8C97A6'}
             >
@@ -162,11 +144,17 @@ function AnalyticsChart({ target, achievement, tier, todayIso, uid }) {
           </g>
         );
       })}
-      <circle cx={lastPt2[0]} cy={lastPt2[1]} r="7" fill={color} opacity="0.16" />
-
-      <rect x={sx} y={baseY2 + 24} width={tChipW} height="18" rx="9" fill="#fff" stroke="#A9776B" strokeWidth="1" />
-      <text x={sx + tChipW / 2} y={baseY2 + 36} textAnchor="middle" fontFamily="Arial" fontSize="10" fontWeight="bold" fill="#A9776B">
-        {tLabel}
+      <circle cx={lastPt[0]} cy={lastPt[1]} r="9" fill={color} opacity="0.16" />
+      <text
+        x={lastPt[0]}
+        y={lastPt[1] - 12}
+        textAnchor="end"
+        fontFamily="Georgia,serif"
+        fontSize="14"
+        fontWeight="bold"
+        fill={color}
+      >
+        {fmtNum(achievement)}
       </text>
     </svg>
   );
