@@ -140,7 +140,16 @@ export default function KpiTable({
                 </tr>
               )}
               <tr>
-              <td className="center">{row.sno}</td>
+              {/* S.No is shown as the row's plain position in this table (1, 2,
+                  3, …), not the raw stored `sno` value — the stored value is
+                  a catalog-ordering key with permanent gaps once a row is
+                  deleted (deleting item #17 doesn't renumber #18 down to #17),
+                  which read as "wrong" numbering to anyone looking at the
+                  report. A recomputed sequential position always looks
+                  correct after any add/delete, with no backend renumbering
+                  needed — kpiItemId (not sno) is what edit/delete actually
+                  key off, so this is purely cosmetic and safe. */}
+              <td className="center">{i + 1}</td>
               <td className="dept">{row.department}</td>
               <td>{row.reportName}</td>
               <td className="num">

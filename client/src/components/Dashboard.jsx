@@ -316,8 +316,8 @@ export default function Dashboard({ user, onLoggedOut }) {
         'Status',
         ...customColumns.map((c) => c.name),
       ];
-      const body = rows.map((r) => [
-        r.sno,
+      const body = rows.map((r, i) => [
+        i + 1,
         r.department,
         r.reportName,
         r.target ?? '',
