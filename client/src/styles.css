@@ -236,7 +236,8 @@ body.force-letterhead .date-filter,
 body.force-letterhead .zone-chips,
 body.force-letterhead .edit-col,
 body.force-letterhead .analytics-col,
-body.force-letterhead .analytics-cell{ display:none !important; }
+body.force-letterhead .analytics-cell,
+body.force-letterhead .zone-analyzer{ display:none !important; }
 body.force-letterhead .sheet-wrap{ box-shadow:none; }
 body.force-letterhead table.kpi-table{ table-layout:fixed;font-size:12px; }
 body.force-letterhead .kpi-table thead th{ word-break:break-word;overflow-wrap:break-word;white-space:normal;font-size:10.5px;padding:8px 6px; }
