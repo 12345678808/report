@@ -127,3 +127,31 @@ export function buildCitywideRows(zones, rowsByZoneId) {
       return { ...row, pending, performance, status };
     });
 }
+
+// Collapses any set of KPI rows (e.g. the full 32-row Overall report) down to
+// one row per department, summing target/achievement across every KPI
+// parameter in that department — for the "Department-wise Summary" export
+// section (a citywide total per department, not a per-KPI-parameter list).
+// Re-derives pending/performance/status from the SUMMED figures (same
+// 99%/90% thresholds as deriveStatus) rather than averaging each row's own
+// status, since e.g. two 50%-performing rows summed might land in a
+// different tier than either row alone.
+export function buildDepartmentSummaryRows(rows) {
+  const byDept = new Map();
+  for (const row of rows) {
+    if (!byDept.has(row.department)) {
+      byDept.set(row.department, { department: row.department, target: null, achievement: null });
+    }
+    const acc = byDept.get(row.department);
+    if (row.target !== null && row.target !== undefined) {
+      acc.target = (acc.target ?? 0) + Number(row.target);
+    }
+    if (row.achievement !== null && row.achievement !== undefined) {
+      acc.achievement = (acc.achievement ?? 0) + Number(row.achievement);
+    }
+  }
+  return Array.from(byDept.values()).map((acc) => {
+    const { pending, performance, status } = deriveStatus(acc.target, acc.achievement);
+    return { department: acc.department, target: acc.target, achievement: acc.achievement, pending, performance, status };
+  });
+}

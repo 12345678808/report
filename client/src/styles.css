@@ -228,6 +228,35 @@ body.force-letterhead .print-letterhead-wrap{ display:block; }
 .excel-btn:hover{ background:var(--green);color:#fff; }
 .excel-btn:disabled{ opacity:0.6;cursor:default; }
 
+/* ---------- Export Options modal (section picker shown before a PDF/Excel
+   download) — reuses .modal-overlay/.modal-card/.modal-head/.modal-dept/
+   .modal-title/.modal-close from the other modals; these are the parts
+   specific to its checkbox layout. ---------- */
+.export-options-body{ margin-top:6px; }
+.export-check-row{ display:flex;align-items:center;gap:9px;font-size:14px;color:var(--ink);padding:7px 0;cursor:pointer; }
+.export-check-row input[type="checkbox"]{ width:16px;height:16px;flex:0 0 auto;cursor:pointer; }
+.export-zone-sub{ margin:0 0 2px 6px;padding-left:16px;border-left:2px solid var(--sky-line); }
+.export-zone-sub .export-check-row{ font-size:13px;padding:5px 0; }
+.export-options-hint{ font-size:12px;color:var(--red);margin:8px 0 0; }
+.export-modal-actions{ display:flex;justify-content:flex-end;gap:8px;margin-top:18px;padding-top:14px;border-top:1px solid var(--sky-line); }
+.export-modal-actions .mini-btn{ padding:9px 16px;font-size:13px; }
+
+/* ---------- Multi-section combined export tree — only mounted while a
+   combined PDF is actually being captured (see Dashboard's
+   multiExportSelection). Tried position:absolute (left:-9999px) and
+   position:fixed (inset:0) here first — both made html2canvas's internal
+   document-clone collapse the element to 0 height (a known html2canvas
+   quirk: fixed/far-off-screen positioning doesn't survive its clone step).
+   Plain normal-flow positioning, same as the existing single-section export
+   already relies on (it captures the real, visible, in-flow .sheet-wrap),
+   is what actually renders — it briefly appears below the normal dashboard
+   content while "Preparing PDF…" shows on the button, then unmounts. */
+.multi-export-wrap{ margin:20px auto;background:#fff; }
+.export-section{ margin-top:26px; }
+.export-section + .export-section{ page-break-before:always;margin-top:0;padding-top:20px; }
+.export-section-title{ font-family:Georgia,serif;font-size:17px;color:var(--navy);font-weight:bold;margin:0 0 10px;padding-bottom:6px;border-bottom:2px solid var(--gold-line); }
+.dept-summary-table{ margin-top:4px; }
+
 /* ---------- force-letterhead: applied to <body> only while html2pdf is
    capturing .sheet-wrap. Hides on-screen-only controls that aren't
    clickable in a PDF and swaps in the letterhead above (via .print-letterhead-wrap). ---------- */

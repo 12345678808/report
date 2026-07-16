@@ -7,8 +7,10 @@ import PrintLetterhead from './PrintLetterhead';
 import AnalyticsModal from './AnalyticsModal';
 import AddRowModal from './AddRowModal';
 import AddColumnModal from './AddColumnModal';
+import ExportOptionsModal from './ExportOptionsModal';
+import DepartmentSummaryTable from './DepartmentSummaryTable';
 import Navbar from './Navbar';
-import { buildCitywideRows, tierLabel } from '../lib/kpiHelpers';
+import { buildCitywideRows, buildDepartmentSummaryRows, tierLabel } from '../lib/kpiHelpers';
 
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 function pad2(n) {
@@ -65,6 +67,15 @@ export default function Dashboard({ user, onLoggedOut }) {
   const [analyticsInfo, setAnalyticsInfo] = useState(null);
   const [showAddRow, setShowAddRow] = useState(false);
   const [showAddColumn, setShowAddColumn] = useState(false);
+
+  // Clicking "Download Report" opens a section-picker instead of exporting
+  // immediately — exportModalFormat is 'pdf' | 'excel' | null (which format's
+  // picker is open). multiExportSelection holds the confirmed choice ({
+  // overall, zoneIds, deptSummary }) only while a combined export is actually
+  // being generated — its presence is what mounts the off-screen
+  // .multi-export-wrap tree that html2pdf captures (see handleDownloadPdfSections).
+  const [exportModalFormat, setExportModalFormat] = useState(null);
+  const [multiExportSelection, setMultiExportSelection] = useState(null);
 
   // Toggling this body class (rather than conditionally rendering the letterhead
   // itself) mirrors one.html's approach: the letterhead markup and CSS to hide
@@ -266,18 +277,37 @@ export default function Dashboard({ user, onLoggedOut }) {
     return isRange ? `${fromDate}_to_${toDate}` : fromDate;
   }
 
-  async function handleDownloadPdf() {
+  // A combined report's letterhead badge/filename should say something more
+  // useful than a single fixed scope once more than one section can be
+  // included — falls back to the exact old single-scope labels when the
+  // selection is still just "whatever one thing was on screen" (the modal's
+  // default), so the common case looks unchanged.
+  function describeSelection(selection) {
+    const parts = [];
+    if (selection.overall) parts.push('Overall');
+    if (selection.zoneIds.length === zones.length && zones.length > 0) parts.push('All Zones');
+    else if (selection.zoneIds.length === 1) parts.push(zones.find((z) => z.id === selection.zoneIds[0])?.name || 'Zone');
+    else if (selection.zoneIds.length > 1) parts.push(`${selection.zoneIds.length} Zones`);
+    if (selection.deptSummary) parts.push('Dept Summary');
+    if (parts.length === 0) return 'Report';
+    if (parts.length === 1) return parts[0];
+    return 'Combined Report';
+  }
+
+  async function handleDownloadPdfSections(selection) {
     if (isExportingPdf) return;
     setError('');
     setAnalyticsInfo(null); // don't capture an open modal into the PDF
     setIsExportingPdf(true);
+    setMultiExportSelection(selection);
     try {
       const { default: html2pdf } = await import('html2pdf.js');
-      // Let the force-letterhead re-render (badge shown, tabs/chips/edit
-      // buttons hidden) actually paint before html2canvas grabs the DOM.
+      // Let the multi-export tree mount and the force-letterhead re-render
+      // (badge shown, tabs/chips/edit buttons hidden) actually paint before
+      // html2canvas grabs the DOM.
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      const target = document.querySelector('.sheet-wrap');
-      const scopeSlug = view === 'zone' ? activeZone?.name || 'Zone' : 'Overall';
+      const target = document.querySelector('.multi-export-wrap');
+      const scopeSlug = describeSelection(selection).replace(/\s+/g, '');
       const opt = {
         margin: 0.3,
         filename: `CCMC_${scopeSlug}_KPI_Report_${rangeSlug()}.pdf`.replace(/\s+/g, '_'),
@@ -291,75 +321,123 @@ export default function Dashboard({ user, onLoggedOut }) {
       setError(`Could not generate PDF: ${err.message}`);
     } finally {
       setIsExportingPdf(false);
+      setMultiExportSelection(null);
     }
   }
 
-  // Builds an .xlsx workbook of whichever report is currently on screen
-  // (Overall or the active Zone), respecting the selected date range and
-  // including any custom columns — a plain client-side export since every
-  // figure needed is already loaded into state.
-  function handleDownloadExcel() {
+  // Shared by every sheet the combined Excel export writes — identical column
+  // layout/widths to the original single-view export, just parameterized by
+  // which rows and title go into this particular sheet.
+  function buildKpiSheet(rows, titleLabel) {
+    const header = [
+      'S.No',
+      'Department',
+      'Report / KPI Parameter',
+      'Target',
+      'Achievement',
+      'Pending',
+      'Performance %',
+      'Status',
+      ...customColumns.map((c) => c.name),
+    ];
+    const body = rows.map((r, i) => [
+      i + 1,
+      r.department,
+      r.reportName,
+      r.target ?? '',
+      r.achievement ?? '',
+      r.pending ?? '',
+      r.performance !== null && r.performance !== undefined ? `${(r.performance * 100).toFixed(2)}%` : '',
+      r.status ? tierLabel(r.status) : '',
+      ...customColumns.map((c) => (r.customValues ? r.customValues[c.id] ?? '' : '')),
+    ]);
+    const sheet = XLSX.utils.aoa_to_sheet([
+      [`CCMC – ${titleLabel} KPI Report`],
+      [`Date range: ${toDdMmYyyy(fromDate)} – ${toDdMmYyyy(toDate)}`],
+      [],
+      header,
+      ...body,
+    ]);
+    sheet['!cols'] = [
+      { wch: 6 }, // S.No
+      { wch: 16 }, // Department
+      { wch: 48 }, // Report / KPI Parameter
+      { wch: 11 }, // Target
+      { wch: 13 }, // Achievement
+      { wch: 11 }, // Pending
+      { wch: 14 }, // Performance %
+      { wch: 10 }, // Status
+      ...customColumns.map(() => ({ wch: 18 })),
+    ];
+    const lastColIdx = header.length - 1;
+    sheet['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: lastColIdx } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: lastColIdx } },
+    ];
+    return sheet;
+  }
+
+  // Builds an .xlsx workbook with one sheet per selected section (Overall,
+  // "Common for all Zones" + each selected zone individually, and/or a
+  // Department-wise Summary sheet) — replaces the old single-sheet-of-
+  // whatever's-on-screen export now that sections are picked explicitly.
+  function handleDownloadExcelSections(selection) {
     if (isExportingExcel) return;
     setError('');
     setIsExportingExcel(true);
     try {
-      const rows = view === 'zone' ? activeZoneRows : overallRows;
-      const scopeLabel = view === 'zone' ? activeZone?.name || 'Zone' : 'Overall';
-      const header = [
-        'S.No',
-        'Department',
-        'Report / KPI Parameter',
-        'Target',
-        'Achievement',
-        'Pending',
-        'Performance %',
-        'Status',
-        ...customColumns.map((c) => c.name),
-      ];
-      const body = rows.map((r, i) => [
-        i + 1,
-        r.department,
-        r.reportName,
-        r.target ?? '',
-        r.achievement ?? '',
-        r.pending ?? '',
-        r.performance !== null && r.performance !== undefined ? `${(r.performance * 100).toFixed(2)}%` : '',
-        r.status ? tierLabel(r.status) : '',
-        ...customColumns.map((c) => (r.customValues ? r.customValues[c.id] ?? '' : '')),
-      ]);
-      const sheet = XLSX.utils.aoa_to_sheet([
-        [`CCMC – ${scopeLabel} KPI Report`],
-        [`Date range: ${toDdMmYyyy(fromDate)} – ${toDdMmYyyy(toDate)}`],
-        [],
-        header,
-        ...body,
-      ]);
-      // Left to itself, SheetJS defaults every column to Excel's ~8.4-char
-      // width, which visually clips longer department/report-name text (the
-      // data isn't lost, but it *looks* cut off in the cell) — explicit
-      // widths, roughly matched to the longest real values in this catalog,
-      // fix that.
-      sheet['!cols'] = [
-        { wch: 6 }, // S.No
-        { wch: 16 }, // Department
-        { wch: 48 }, // Report / KPI Parameter
-        { wch: 11 }, // Target
-        { wch: 13 }, // Achievement
-        { wch: 11 }, // Pending
-        { wch: 14 }, // Performance %
-        { wch: 10 }, // Status
-        ...customColumns.map(() => ({ wch: 18 })),
-      ];
-      // Merge the two title rows across the full column width so they read
-      // as a proper report header instead of overflowing into column B.
-      const lastColIdx = header.length - 1;
-      sheet['!merges'] = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: lastColIdx } },
-        { s: { r: 1, c: 0 }, e: { r: 1, c: lastColIdx } },
-      ];
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, sheet, scopeLabel.slice(0, 31) || 'Report');
-      XLSX.writeFile(workbook, `CCMC_${scopeLabel}_KPI_Report_${rangeSlug()}.xlsx`.replace(/\s+/g, '_'));
+      const usedNames = new Set();
+      function appendUnique(sheet, desiredName) {
+        let name = desiredName.slice(0, 31) || 'Sheet';
+        let n = 2;
+        while (usedNames.has(name)) {
+          const suffix = ` (${n})`;
+          name = desiredName.slice(0, 31 - suffix.length) + suffix;
+          n += 1;
+        }
+        usedNames.add(name);
+        XLSX.utils.book_append_sheet(workbook, sheet, name);
+      }
+
+      if (selection.overall) {
+        appendUnique(buildKpiSheet(overallRows, 'Overall'), 'Overall');
+      }
+      if (selection.zoneIds.length > 0) {
+        appendUnique(buildKpiSheet(commonRows, 'Common for all Zones'), 'Common (All Zones)');
+        selection.zoneIds.forEach((zid) => {
+          const zone = zones.find((z) => z.id === zid);
+          appendUnique(buildKpiSheet(zoneRowsById[zid] || [], zone?.name || 'Zone'), zone?.name || 'Zone');
+        });
+      }
+      if (selection.deptSummary) {
+        const deptRows = buildDepartmentSummaryRows(overallRows);
+        const deptHeader = ['Department', 'Total Target', 'Total Achievement', 'Pending', 'Performance %', 'Status'];
+        const deptBody = deptRows.map((r) => [
+          r.department,
+          r.target ?? '',
+          r.achievement ?? '',
+          r.pending ?? '',
+          r.performance !== null && r.performance !== undefined ? `${(r.performance * 100).toFixed(2)}%` : '',
+          r.status ? tierLabel(r.status) : '',
+        ]);
+        const deptSheet = XLSX.utils.aoa_to_sheet([
+          ['CCMC – Department-wise Summary'],
+          [`Date range: ${toDdMmYyyy(fromDate)} – ${toDdMmYyyy(toDate)}`],
+          [],
+          deptHeader,
+          ...deptBody,
+        ]);
+        deptSheet['!cols'] = [{ wch: 18 }, { wch: 14 }, { wch: 16 }, { wch: 12 }, { wch: 14 }, { wch: 12 }];
+        deptSheet['!merges'] = [
+          { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } },
+          { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } },
+        ];
+        appendUnique(deptSheet, 'Dept Summary');
+      }
+
+      const scopeSlug = describeSelection(selection).replace(/\s+/g, '');
+      XLSX.writeFile(workbook, `CCMC_${scopeSlug}_KPI_Report_${rangeSlug()}.xlsx`.replace(/\s+/g, '_'));
     } catch (err) {
       setError(`Could not generate Excel file: ${err.message}`);
     } finally {
@@ -439,10 +517,10 @@ export default function Dashboard({ user, onLoggedOut }) {
                 + Add Column
               </button>
             )}
-            <button type="button" className="pdf-btn" onClick={handleDownloadPdf} disabled={isExportingPdf}>
+            <button type="button" className="pdf-btn" onClick={() => setExportModalFormat('pdf')} disabled={isExportingPdf}>
               {isExportingPdf ? 'Preparing PDF…' : 'Download Report (PDF)'}
             </button>
-            <button type="button" className="excel-btn" onClick={handleDownloadExcel} disabled={isExportingExcel}>
+            <button type="button" className="excel-btn" onClick={() => setExportModalFormat('excel')} disabled={isExportingExcel}>
               {isExportingExcel ? 'Preparing Excel…' : 'Download Report (Excel)'}
             </button>
           </div>
@@ -558,6 +636,103 @@ export default function Dashboard({ user, onLoggedOut }) {
             </>
           ))}
       </main>
+
+      {/* Only mounted while a combined PDF export is actually being
+          generated (see handleDownloadPdfSections) — positioned off-screen
+          rather than display:none so html2canvas still gets a real, laid-out
+          DOM tree to capture without the user seeing a flash of it on screen.
+          Reuses PrintLetterhead + KpiTable/DepartmentSummaryTable exactly as
+          the on-screen report does, just assembling whichever sections the
+          Export Options modal picked, each starting on its own PDF page. */}
+      {multiExportSelection && (
+        <div className="multi-export-wrap sheet-wrap">
+          <PrintLetterhead
+            scopeLabel={describeSelection(multiExportSelection)}
+            genDateLabel={reportGenLabels().dateLabel}
+            genTimeLabel={reportGenLabels().timeLabel}
+          />
+          <div className="sheet-date">
+            DATE RANGE <b>{fromLabel} &ndash; {toLabel}</b>
+          </div>
+
+          {multiExportSelection.overall && (
+            <div className="export-section">
+              <h2 className="export-section-title">Overall (Citywide)</h2>
+              <KpiTable
+                rows={overallRows}
+                canEdit={false}
+                canManageCatalog={false}
+                onSave={() => {}}
+                zoneId={null}
+                date={fromDate}
+                onViewAnalytics={() => {}}
+                showDeptHeadings={false}
+                customColumns={customColumns}
+                isExportingPdf
+              />
+            </div>
+          )}
+
+          {multiExportSelection.zoneIds.length > 0 && (
+            <div className="export-section">
+              <h2 className="export-section-title">Common for all Zones &ndash; Public Health</h2>
+              <KpiTable
+                rows={commonRows}
+                canEdit={false}
+                canManageCatalog={false}
+                onSave={() => {}}
+                zoneId={null}
+                date={fromDate}
+                onViewAnalytics={() => {}}
+                customColumns={customColumns}
+                isExportingPdf
+              />
+            </div>
+          )}
+
+          {multiExportSelection.zoneIds.map((zid) => {
+            const zone = zones.find((z) => z.id === zid);
+            return (
+              <div className="export-section" key={zid}>
+                <h2 className="export-section-title">{zone?.name || 'Zone'} Zone</h2>
+                <KpiTable
+                  rows={zoneRowsById[zid] || []}
+                  canEdit={false}
+                  canManageCatalog={false}
+                  onSave={() => {}}
+                  zoneId={zid}
+                  date={fromDate}
+                  onViewAnalytics={() => {}}
+                  customColumns={customColumns}
+                  isExportingPdf
+                />
+              </div>
+            );
+          })}
+
+          {multiExportSelection.deptSummary && (
+            <div className="export-section">
+              <h2 className="export-section-title">Department-wise Summary</h2>
+              <DepartmentSummaryTable rows={buildDepartmentSummaryRows(overallRows)} />
+            </div>
+          )}
+        </div>
+      )}
+
+      {exportModalFormat && (
+        <ExportOptionsModal
+          zones={zones}
+          format={exportModalFormat}
+          initialView={view}
+          initialZoneId={activeZoneId}
+          onClose={() => setExportModalFormat(null)}
+          onConfirm={(selection) => {
+            setExportModalFormat(null);
+            if (exportModalFormat === 'pdf') handleDownloadPdfSections(selection);
+            else handleDownloadExcelSections(selection);
+          }}
+        />
+      )}
 
       {analyticsInfo && <AnalyticsModal info={analyticsInfo} dateIso={toDate} onClose={() => setAnalyticsInfo(null)} />}
       {showAddRow && (
