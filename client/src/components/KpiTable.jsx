@@ -250,7 +250,7 @@ export default function KpiTable({
                           Edit
                         </button>
                       )}
-                      {!rowEditable && <span className="edit-elsewhere">Zone report</span>}
+                      {!rowEditable && <span className="edit-elsewhere">{row.editHint || 'Zone report'}</span>}
                       {canManageCatalog && (
                         <button
                           className="mini-btn delete"

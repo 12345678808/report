@@ -161,21 +161,35 @@ function AnalyticsChart({ target, achievement, tier, todayIso, uid }) {
 }
 
 // info: { dept, report, target, achievement, pending, performance, status, note, zoneName, zoneRows }
-// dateIso: the single report date currently seeded (e.g. '2026-07-12')
-export default function AnalyticsModal({ info, dateIso, onClose }) {
+// fromDateIso/toDateIso: the exact From/To range currently selected on the
+// dashboard's date filter (equal to each other when a single day is picked).
+// Previously this modal only ever received the "To" date and silently
+// collapsed any selected range down to that one day — so picking, say,
+// 10/7 - 14/7 on the dashboard (whose figures are the summed range) still
+// showed the modal's Day view as just "14/7", making it look like a
+// different, single-day figure. Now the Day view honors the real selected
+// range, and only Month/Year (which derive their own start-of-period date)
+// anchor off the To date.
+export default function AnalyticsModal({ info, fromDateIso, toDateIso, onClose }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
   const [period, setPeriod] = useState('day');
 
-  const anchor = new Date(`${dateIso}T00:00:00`);
-  let periodDisplay = `${anchor.getDate()}/${anchor.getMonth() + 1}`;
-  let fromDate = dateIso;
-  let toDate = dateIso;
+  const anchor = new Date(`${toDateIso}T00:00:00`);
+  const fromAnchor = new Date(`${fromDateIso}T00:00:00`);
+  const isDayRange = fromDateIso !== toDateIso;
+  let periodDisplay = isDayRange
+    ? `${fromAnchor.getDate()}/${fromAnchor.getMonth() + 1} – ${anchor.getDate()}/${anchor.getMonth() + 1}`
+    : `${anchor.getDate()}/${anchor.getMonth() + 1}`;
+  let fromDate = fromDateIso;
+  let toDate = toDateIso;
   if (period === 'month') {
     periodDisplay = `${MONTH_NAMES_FULL[anchor.getMonth()]} ${anchor.getFullYear()}`;
     fromDate = `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, '0')}-01`;
+    toDate = toDateIso;
   } else if (period === 'year') {
     periodDisplay = `${anchor.getFullYear()}`;
     fromDate = `${anchor.getFullYear()}-01-01`;
+    toDate = toDateIso;
   }
 
   const target = Number(info.target);
@@ -264,7 +278,7 @@ export default function AnalyticsModal({ info, dateIso, onClose }) {
 
         <div className="modal-chart-wrap">
           {hasNumbers && target >= 0 && achievement >= 0 ? (
-            <AnalyticsChart target={target} achievement={achievement} tier={tier} todayIso={dateIso} uid={uid} />
+            <AnalyticsChart target={target} achievement={achievement} tier={tier} todayIso={toDateIso} uid={uid} />
           ) : (
             <p style={{ fontSize: '12px', color: 'var(--ink-soft)', padding: '30px 4px', textAlign: 'center' }}>
               No numeric target/achievement figures available yet for this report item.

@@ -308,8 +308,10 @@ body.force-letterhead .zone-analyzer{ box-shadow:none; }
 .za-bar-fill{ height:100%;border-radius:6px; }
 
 /* ---------- zone chips + zone report header ---------- */
-.zone-common-block{ margin-bottom:26px;padding:16px 18px 18px;background:var(--gold-light);border:1px solid var(--gold-line);border-radius:12px; }
-.zone-common-title{ font-size:11px;text-transform:uppercase;letter-spacing:0.4px;color:var(--ink-soft);margin:0 0 10px; }
+/* Public Health used to render in its own "Common for all zones" block here
+   (.zone-common-block/.zone-common-title) — it's now merged directly into
+   each zone's own table instead (read-only there), so those rules were
+   removed along with the block. */
 .zone-chips{ display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px; }
 .zone-chip{ padding:9px 20px;border:1px solid var(--sky-line);background:#fff;color:var(--steel);font-size:12.5px;font-weight:bold;border-radius:20px;cursor:pointer;transition:box-shadow 0.15s,background 0.15s; }
 .zone-chip:hover{ background:var(--gold-light); }

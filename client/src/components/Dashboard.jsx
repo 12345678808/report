@@ -380,9 +380,10 @@ export default function Dashboard({ user, onLoggedOut }) {
   }
 
   // Builds an .xlsx workbook with one sheet per selected section (Overall,
-  // "Common for all Zones" + each selected zone individually, and/or a
-  // Department-wise Summary sheet) — replaces the old single-sheet-of-
-  // whatever's-on-screen export now that sections are picked explicitly.
+  // each selected zone individually — with Public Health merged in, since
+  // there's no separate "Common" section anymore — and/or a Department-wise
+  // Summary sheet) — replaces the old single-sheet-of-whatever's-on-screen
+  // export now that sections are picked explicitly.
   function handleDownloadExcelSections(selection) {
     if (isExportingExcel) return;
     setError('');
@@ -406,10 +407,10 @@ export default function Dashboard({ user, onLoggedOut }) {
         appendUnique(buildKpiSheet(overallRows, 'Overall'), 'Overall');
       }
       if (selection.zoneIds.length > 0) {
-        appendUnique(buildKpiSheet(commonRows, 'Common for all Zones'), 'Common (All Zones)');
         selection.zoneIds.forEach((zid) => {
           const zone = zones.find((z) => z.id === zid);
-          appendUnique(buildKpiSheet(zoneRowsById[zid] || [], zone?.name || 'Zone'), zone?.name || 'Zone');
+          const rows = [...commonRowsReadOnly, ...(zoneRowsById[zid] || [])];
+          appendUnique(buildKpiSheet(rows, zone?.name || 'Zone'), zone?.name || 'Zone');
         });
       }
       if (selection.departments.length > 0) {
@@ -455,6 +456,16 @@ export default function Dashboard({ user, onLoggedOut }) {
   const canEditValues = canEdit && !isRange;
   const activeZone = zones.find((z) => z.id === activeZoneId);
   const activeZoneRows = activeZoneId != null ? zoneRowsById[activeZoneId] || [] : [];
+  // Public Health (commonRows) isn't tracked per-zone in the data model — the
+  // same org-wide figure applies to every zone. Per explicit request ("public
+  // health um zone ku kila kondu vandhu, common-na edhume venda" — bring
+  // Public Health under the zone tables too, no separate "Common" section),
+  // it's no longer shown as its own block above the zone chips; instead it's
+  // merged straight into each zone's own table, read-only (the real place to
+  // edit it stays the Overall report tab, same as before — only the display
+  // location moved, not the editing rule).
+  const commonRowsReadOnly = commonRows.map((r) => ({ ...r, editable: false, editHint: 'Overall report' }));
+  const displayZoneRows = [...commonRowsReadOnly, ...activeZoneRows];
   // All 32+ KPIs for the Overall report: the real common (citywide) rows,
   // editable as usual, plus a read-only citywide rollup of the zone-scoped
   // rows (summed across all 5 zones) — see buildCitywideRows for why those
@@ -586,21 +597,6 @@ export default function Dashboard({ user, onLoggedOut }) {
             <>
               <ZoneAnalyzer zones={zones} rowsByZoneId={zoneRowsById} />
 
-              <div className="zone-common-block">
-                <p className="zone-common-title">Common for all zones &ndash; Public Health</p>
-                <KpiTable
-                  rows={commonRows}
-                  canEdit={false}
-                  canManageCatalog={false}
-                  onSave={() => {}}
-                  zoneId={null}
-                  date={fromDate}
-                  onViewAnalytics={handleViewAnalytics}
-                  customColumns={customColumns}
-                  isExportingPdf={isExportingPdf}
-                />
-              </div>
-
               <div className="zone-chips">
                 {zones.map((z) => (
                   <button
@@ -621,7 +617,7 @@ export default function Dashboard({ user, onLoggedOut }) {
                   </div>
                   <KpiTable
                     key={activeZone.id}
-                    rows={activeZoneRows}
+                    rows={displayZoneRows}
                     canEdit={canEditValues}
                     canManageCatalog={canEdit}
                     onSave={handleSaveZone}
@@ -675,30 +671,13 @@ export default function Dashboard({ user, onLoggedOut }) {
             </div>
           )}
 
-          {multiExportSelection.zoneIds.length > 0 && (
-            <div className="export-section">
-              <h2 className="export-section-title">Common for all Zones &ndash; Public Health</h2>
-              <KpiTable
-                rows={commonRows}
-                canEdit={false}
-                canManageCatalog={false}
-                onSave={() => {}}
-                zoneId={null}
-                date={fromDate}
-                onViewAnalytics={() => {}}
-                customColumns={customColumns}
-                isExportingPdf
-              />
-            </div>
-          )}
-
           {multiExportSelection.zoneIds.map((zid) => {
             const zone = zones.find((z) => z.id === zid);
             return (
               <div className="export-section" key={zid}>
                 <h2 className="export-section-title">{zone?.name || 'Zone'} Zone</h2>
                 <KpiTable
-                  rows={zoneRowsById[zid] || []}
+                  rows={[...commonRowsReadOnly, ...(zoneRowsById[zid] || [])]}
                   canEdit={false}
                   canManageCatalog={false}
                   onSave={() => {}}
@@ -739,7 +718,9 @@ export default function Dashboard({ user, onLoggedOut }) {
         />
       )}
 
-      {analyticsInfo && <AnalyticsModal info={analyticsInfo} dateIso={toDate} onClose={() => setAnalyticsInfo(null)} />}
+      {analyticsInfo && (
+        <AnalyticsModal info={analyticsInfo} fromDateIso={fromDate} toDateIso={toDate} onClose={() => setAnalyticsInfo(null)} />
+      )}
       {showAddRow && (
         <AddRowModal departments={departmentNames} onClose={() => setShowAddRow(false)} onSubmit={handleAddRow} />
       )}
