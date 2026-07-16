@@ -185,7 +185,7 @@ export default function AnalyticsModal({ info, dateIso, onClose }) {
   const accentColor = tier ? tierPastelColor(tier) : 'var(--sky-line)';
 
   const zoneStats = info.zoneName && info.zoneRows ? computeZoneStats(info.zoneRows) : null;
-  const zoneTier = zoneStats && zoneStats.pct !== null ? (zoneStats.pct >= 85 ? 'Ok' : zoneStats.pct >= 50 ? 'Medium' : 'Low') : null;
+  const zoneTier = zoneStats && zoneStats.pct !== null ? (zoneStats.pct >= 99 ? 'Ok' : zoneStats.pct >= 90 ? 'Medium' : 'Low') : null;
   const zoneColor = zoneTier ? tierPastelColor(zoneTier) : 'var(--steel)';
 
   return (

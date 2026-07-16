@@ -14,7 +14,9 @@ function deriveStatus(target, achievement) {
   let status = null;
   if (performance != null) {
     const pct = performance * 100;
-    status = pct >= 85 ? 'Ok' : pct >= 50 ? 'Medium' : 'Low';
+    // Tier thresholds: 99%+ = Ok/Completed (yellow), 90-98.99% = Medium (green),
+    // below 90% = Low (red).
+    status = pct >= 99 ? 'Ok' : pct >= 90 ? 'Medium' : 'Low';
   }
   return { pending, performance, status };
 }

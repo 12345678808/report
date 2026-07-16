@@ -69,7 +69,8 @@ function toRowValues(item) {
   let status = '';
   if (performance !== '') {
     const pct = performance * 100;
-    status = pct >= 85 ? 'Ok' : pct >= 50 ? 'Medium' : 'Low';
+    // Kept in sync with kpiStore.js's deriveStatus thresholds (99% / 90%).
+    status = pct >= 99 ? 'Ok' : pct >= 90 ? 'Medium' : 'Low';
   }
   return [
     item.zone_name,

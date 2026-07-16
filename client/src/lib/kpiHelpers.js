@@ -26,7 +26,7 @@ export function tierFromStatus(status) {
 }
 
 // The stored/derived tier value stays 'Ok' internally everywhere (deriveStatus's
-// 85% threshold, tierChartColor/tierPastelColor lookups, the dot-yellow CSS
+// 99% threshold, tierChartColor/tierPastelColor lookups, the dot-yellow CSS
 // class, etc.) — only the text shown to the user changes, per an explicit
 // request to relabel the yellow ("Ok") tier as "Completed" without touching
 // any of the underlying logic those other places depend on.
@@ -79,7 +79,9 @@ export function deriveStatus(target, achievement) {
   let status = null;
   if (performance !== null) {
     const pct = performance * 100;
-    status = pct >= 85 ? 'Ok' : pct >= 50 ? 'Medium' : 'Low';
+    // Tier thresholds: 99%+ = Ok/Completed (yellow), 90-98.99% = Medium (green),
+    // below 90% = Low (red).
+    status = pct >= 99 ? 'Ok' : pct >= 90 ? 'Medium' : 'Low';
   }
   return { pending, performance, status };
 }

@@ -36,7 +36,7 @@ export default function ZoneAnalyzer({ zones, rowsByZoneId }) {
           // that row's own target/achievement) isn't the same as the zone's
           // aggregate tier — re-derive the tier from the aggregate pct so the
           // card matches the aggregate percentage it's actually showing.
-          const aggStatus = pct === null ? null : pct >= 85 ? 'Ok' : pct >= 50 ? 'Medium' : 'Low';
+          const aggStatus = pct === null ? null : pct >= 99 ? 'Ok' : pct >= 90 ? 'Medium' : 'Low';
           const tier = tierFromStatus(aggStatus);
           const color = tierChartColor(tier);
           const tint = tier ? `${color}1a` : 'var(--sky)';
