@@ -61,11 +61,16 @@ function rowKey(zoneName, department, reportName, date) {
 }
 
 function toRowValues(item) {
-  const pending = item.target != null && item.achievement != null ? Number(item.target) - Number(item.achievement) : '';
-  const performance =
-    item.target != null && Number(item.target) > 0 && item.achievement != null
-      ? Number(item.achievement) / Number(item.target)
-      : '';
+  const hasTarget = item.target != null && Number(item.target) > 0;
+  const pending = hasTarget && item.achievement != null ? Number(item.target) - Number(item.achievement) : '';
+  let performance = '';
+  if (hasTarget && item.achievement != null) {
+    performance = Number(item.achievement) / Number(item.target);
+  } else if (!hasTarget && item.achievement != null) {
+    // Kept in sync with kpiStore.js's deriveStatus: no fixed target -> treat
+    // the achievement figure itself as already being the percentage.
+    performance = Number(item.achievement) / 100;
+  }
   let status = '';
   if (performance !== '') {
     const pct = performance * 100;

@@ -220,6 +220,21 @@ export default function Dashboard({ user, onLoggedOut }) {
     });
   }
 
+  // The Zone report tab's per-zone table now has Public Health (a common,
+  // org-wide row) merged in alongside that zone's own rows (see
+  // commonRowsForZoneTable/displayZoneRows). Editing a Public Health row from
+  // there must still save as a common entry (zoneId null, via
+  // row.saveZoneId — see KpiTable's commitEdit), landing in commonRows, not
+  // zoneRowsById. This router picks the right save+local-state-update path
+  // based on the zoneId the edit actually comes in with.
+  async function handleSaveZoneOrCommon(payload) {
+    if (payload.zoneId === null) {
+      await handleSaveCommon(payload);
+    } else {
+      await handleSaveZone(payload);
+    }
+  }
+
   // Adds a brand-new KPI parameter (a new table row, not just a new date's
   // figure for an existing row). The server slots it into the right spot in
   // its department's sno sequence, which can shift other items' sno values —
@@ -409,7 +424,7 @@ export default function Dashboard({ user, onLoggedOut }) {
       if (selection.zoneIds.length > 0) {
         selection.zoneIds.forEach((zid) => {
           const zone = zones.find((z) => z.id === zid);
-          const rows = [...commonRowsReadOnly, ...(zoneRowsById[zid] || [])];
+          const rows = [...commonRows, ...(zoneRowsById[zid] || [])];
           appendUnique(buildKpiSheet(rows, zone?.name || 'Zone'), zone?.name || 'Zone');
         });
       }
@@ -461,11 +476,13 @@ export default function Dashboard({ user, onLoggedOut }) {
   // health um zone ku kila kondu vandhu, common-na edhume venda" — bring
   // Public Health under the zone tables too, no separate "Common" section),
   // it's no longer shown as its own block above the zone chips; instead it's
-  // merged straight into each zone's own table, read-only (the real place to
-  // edit it stays the Overall report tab, same as before — only the display
-  // location moved, not the editing rule).
-  const commonRowsReadOnly = commonRows.map((r) => ({ ...r, editable: false, editHint: 'Overall report' }));
-  const displayZoneRows = [...commonRowsReadOnly, ...activeZoneRows];
+  // merged straight into each zone's own table. It stays genuinely editable
+  // there too (not just a read-only display) — saveZoneId:null tells
+  // KpiTable's commitEdit to save it as a common entry regardless of which
+  // zone's table it's shown in, and handleSaveZoneOrCommon (below) routes the
+  // save to the right local state (commonRows vs zoneRowsById) accordingly.
+  const commonRowsForZoneTable = commonRows.map((r) => ({ ...r, saveZoneId: null }));
+  const displayZoneRows = [...commonRowsForZoneTable, ...activeZoneRows];
   // All 32+ KPIs for the Overall report: the real common (citywide) rows,
   // editable as usual, plus a read-only citywide rollup of the zone-scoped
   // rows (summed across all 5 zones) — see buildCitywideRows for why those
@@ -620,7 +637,7 @@ export default function Dashboard({ user, onLoggedOut }) {
                     rows={displayZoneRows}
                     canEdit={canEditValues}
                     canManageCatalog={canEdit}
-                    onSave={handleSaveZone}
+                    onSave={handleSaveZoneOrCommon}
                     onDeleteRow={handleDeleteRow}
                     zoneId={activeZone.id}
                     date={fromDate}
@@ -677,7 +694,7 @@ export default function Dashboard({ user, onLoggedOut }) {
               <div className="export-section" key={zid}>
                 <h2 className="export-section-title">{zone?.name || 'Zone'} Zone</h2>
                 <KpiTable
-                  rows={[...commonRowsReadOnly, ...(zoneRowsById[zid] || [])]}
+                  rows={[...commonRows, ...(zoneRowsById[zid] || [])]}
                   canEdit={false}
                   canManageCatalog={false}
                   onSave={() => {}}

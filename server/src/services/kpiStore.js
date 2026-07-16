@@ -8,9 +8,23 @@
 const { pool } = require('../db');
 
 function deriveStatus(target, achievement) {
-  const pending = target != null && achievement != null ? Number(target) - Number(achievement) : null;
-  const performance =
-    target != null && Number(target) > 0 && achievement != null ? Number(achievement) / Number(target) : null;
+  const hasTarget = target != null && Number(target) > 0;
+  // "Pending" (target minus achievement) only means something when there's a
+  // real target to fall short of or exceed — leave it blank without one.
+  const pending = hasTarget && achievement != null ? Number(target) - Number(achievement) : null;
+  let performance = null;
+  if (hasTarget && achievement != null) {
+    performance = Number(achievement) / Number(target);
+  } else if (!hasTarget && achievement != null) {
+    // Some KPIs (several Public Health items, for instance) are open-ended
+    // counts with no fixed target entered at all — deliberately, not as an
+    // oversight. Previously that left Performance %/Status blank forever
+    // since there was nothing to divide achievement by. Per explicit
+    // request, treat the achievement figure itself as already being the
+    // percentage in that case (achievement=45 -> shown/derived as 45%)
+    // rather than leaving the row looking incomplete.
+    performance = Number(achievement) / 100;
+  }
   let status = null;
   if (performance != null) {
     const pct = performance * 100;

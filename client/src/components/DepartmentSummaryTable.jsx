@@ -42,9 +42,8 @@ export default function DepartmentSummaryTable({ rows }) {
               <td className="num">{fmtPct(row.performance)}</td>
               <td className="center">
                 {meta && (
-                  <span className="status-pill">
+                  <span className="status-pill" title={meta.label}>
                     <span className={`status-dot ${meta.cls}`}></span>
-                    {meta.label}
                   </span>
                 )}
               </td>

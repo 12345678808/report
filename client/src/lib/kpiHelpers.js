@@ -74,8 +74,18 @@ export function computeZoneStats(rows) {
 // so client-side aggregates (e.g. the citywide rollup below) land on the
 // exact same Ok/Medium/Low thresholds as a real saved entry would.
 export function deriveStatus(target, achievement) {
-  const pending = target !== null && achievement !== null ? target - achievement : null;
-  const performance = target !== null && target > 0 && achievement !== null ? achievement / target : null;
+  const hasTarget = target !== null && target !== undefined && target > 0;
+  const pending = hasTarget && achievement !== null && achievement !== undefined ? target - achievement : null;
+  let performance = null;
+  if (hasTarget && achievement !== null && achievement !== undefined) {
+    performance = achievement / target;
+  } else if (!hasTarget && achievement !== null && achievement !== undefined) {
+    // Some KPIs (several Public Health items) have no fixed target at all —
+    // treat the achievement figure itself as already being the percentage
+    // instead of leaving Performance %/Status blank (kept in sync with the
+    // same rule in server/src/services/kpiStore.js's deriveStatus).
+    performance = achievement / 100;
+  }
   let status = null;
   if (performance !== null) {
     const pct = performance * 100;

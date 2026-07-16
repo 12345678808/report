@@ -55,9 +55,15 @@ export default function KpiTable({
   async function commitEdit(row) {
     setSavingId(row.kpiItemId);
     try {
+      // Most rows save under this table's own zoneId (or null for a common
+      // table), but a row can override that via row.saveZoneId — used when a
+      // common (org-wide) row like Public Health is displayed merged into a
+      // per-zone table: it must still save as a common entry (zoneId null),
+      // not silently get scoped to whichever zone's table it's shown in.
+      const saveZoneId = row.saveZoneId !== undefined ? row.saveZoneId : zoneId ?? null;
       await onSave({
         kpiItemId: row.kpiItemId,
-        zoneId: zoneId ?? null,
+        zoneId: saveZoneId,
         date,
         target: draft.target === '' ? null : Number(draft.target),
         achievement: draft.achievement === '' ? null : Number(draft.achievement),
@@ -181,9 +187,8 @@ export default function KpiTable({
               <td className="num">{fmtPct(row.performance)}</td>
               <td className="center">
                 {meta && (
-                  <span className="status-pill">
+                  <span className="status-pill" title={meta.label}>
                     <span className={`status-dot ${meta.cls}`}></span>
-                    {meta.label}
                   </span>
                 )}
               </td>
