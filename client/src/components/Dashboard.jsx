@@ -71,7 +71,7 @@ export default function Dashboard({ user, onLoggedOut }) {
   // Clicking "Download Report" opens a section-picker instead of exporting
   // immediately — exportModalFormat is 'pdf' | 'excel' | null (which format's
   // picker is open). multiExportSelection holds the confirmed choice ({
-  // overall, zoneIds, deptSummary }) only while a combined export is actually
+  // overall, zoneIds, departments }) only while a combined export is actually
   // being generated — its presence is what mounts the off-screen
   // .multi-export-wrap tree that html2pdf captures (see handleDownloadPdfSections).
   const [exportModalFormat, setExportModalFormat] = useState(null);
@@ -288,7 +288,9 @@ export default function Dashboard({ user, onLoggedOut }) {
     if (selection.zoneIds.length === zones.length && zones.length > 0) parts.push('All Zones');
     else if (selection.zoneIds.length === 1) parts.push(zones.find((z) => z.id === selection.zoneIds[0])?.name || 'Zone');
     else if (selection.zoneIds.length > 1) parts.push(`${selection.zoneIds.length} Zones`);
-    if (selection.deptSummary) parts.push('Dept Summary');
+    if (selection.departments.length === departmentNames.length && departmentNames.length > 0) parts.push('Dept Summary (All)');
+    else if (selection.departments.length === 1) parts.push(`${selection.departments[0]} Summary`);
+    else if (selection.departments.length > 1) parts.push('Dept Summary');
     if (parts.length === 0) return 'Report';
     if (parts.length === 1) return parts[0];
     return 'Combined Report';
@@ -410,8 +412,8 @@ export default function Dashboard({ user, onLoggedOut }) {
           appendUnique(buildKpiSheet(zoneRowsById[zid] || [], zone?.name || 'Zone'), zone?.name || 'Zone');
         });
       }
-      if (selection.deptSummary) {
-        const deptRows = buildDepartmentSummaryRows(overallRows);
+      if (selection.departments.length > 0) {
+        const deptRows = buildDepartmentSummaryRows(overallRows).filter((r) => selection.departments.includes(r.department));
         const deptHeader = ['Department', 'Total Target', 'Total Achievement', 'Pending', 'Performance %', 'Status'];
         const deptBody = deptRows.map((r) => [
           r.department,
@@ -710,10 +712,12 @@ export default function Dashboard({ user, onLoggedOut }) {
             );
           })}
 
-          {multiExportSelection.deptSummary && (
+          {multiExportSelection.departments.length > 0 && (
             <div className="export-section">
               <h2 className="export-section-title">Department-wise Summary</h2>
-              <DepartmentSummaryTable rows={buildDepartmentSummaryRows(overallRows)} />
+              <DepartmentSummaryTable
+                rows={buildDepartmentSummaryRows(overallRows).filter((r) => multiExportSelection.departments.includes(r.department))}
+              />
             </div>
           )}
         </div>
@@ -722,6 +726,7 @@ export default function Dashboard({ user, onLoggedOut }) {
       {exportModalFormat && (
         <ExportOptionsModal
           zones={zones}
+          departments={departmentNames}
           format={exportModalFormat}
           initialView={view}
           initialZoneId={activeZoneId}

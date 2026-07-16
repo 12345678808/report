@@ -9,17 +9,23 @@ import { useState } from 'react';
 // touch any checkbox and just clicks Generate gets exactly the old
 // behavior (whatever report they were already looking at) — the new
 // combined-sections power only kicks in once they check more boxes.
-export default function ExportOptionsModal({ zones, format, initialView, initialZoneId, onClose, onConfirm }) {
+export default function ExportOptionsModal({ zones, departments = [], format, initialView, initialZoneId, onClose, onConfirm }) {
   const [overall, setOverall] = useState(initialView === 'overall');
   const [zoneWise, setZoneWise] = useState(initialView === 'zone');
   const [allZones, setAllZones] = useState(false);
   const [selectedZoneIds, setSelectedZoneIds] = useState(
     initialView === 'zone' && initialZoneId != null ? [initialZoneId] : []
   );
-  const [deptSummary, setDeptSummary] = useState(false);
+  const [deptWise, setDeptWise] = useState(false);
+  const [allDepts, setAllDepts] = useState(false);
+  const [selectedDepts, setSelectedDepts] = useState([]);
 
   function toggleZone(id) {
     setSelectedZoneIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function toggleDept(name) {
+    setSelectedDepts((prev) => (prev.includes(name) ? prev.filter((x) => x !== name) : [...prev, name]));
   }
 
   function handleZoneWiseToggle(checked) {
@@ -29,11 +35,16 @@ export default function ExportOptionsModal({ zones, format, initialView, initial
     }
   }
 
+  function handleDeptWiseToggle(checked) {
+    setDeptWise(checked);
+  }
+
   const zoneIdsToExport = zoneWise ? (allZones ? zones.map((z) => z.id) : selectedZoneIds) : [];
-  const nothingSelected = !overall && zoneIdsToExport.length === 0 && !deptSummary;
+  const deptsToExport = deptWise ? (allDepts ? departments : selectedDepts) : [];
+  const nothingSelected = !overall && zoneIdsToExport.length === 0 && deptsToExport.length === 0;
 
   function handleGenerate() {
-    onConfirm({ overall, zoneIds: zoneIdsToExport, deptSummary });
+    onConfirm({ overall, zoneIds: zoneIdsToExport, departments: deptsToExport });
   }
 
   return (
@@ -75,9 +86,25 @@ export default function ExportOptionsModal({ zones, format, initialView, initial
           )}
 
           <label className="export-check-row">
-            <input type="checkbox" checked={deptSummary} onChange={(e) => setDeptSummary(e.target.checked)} />
-            Department-wise Summary (citywide total per department)
+            <input type="checkbox" checked={deptWise} onChange={(e) => handleDeptWiseToggle(e.target.checked)} />
+            Department-wise Summary
           </label>
+
+          {deptWise && (
+            <div className="export-zone-sub">
+              <label className="export-check-row indent">
+                <input type="checkbox" checked={allDepts} onChange={(e) => setAllDepts(e.target.checked)} />
+                All Departments (citywide total per department)
+              </label>
+              {!allDepts &&
+                departments.map((d) => (
+                  <label className="export-check-row indent" key={d}>
+                    <input type="checkbox" checked={selectedDepts.includes(d)} onChange={() => toggleDept(d)} />
+                    {d}
+                  </label>
+                ))}
+            </div>
+          )}
 
           {nothingSelected && <p className="export-options-hint">Pick at least one section to generate a report.</p>}
         </div>
