@@ -147,6 +147,39 @@ router.get('/zone/:zoneId', requireAuth, async (req, res) => {
   res.json(rows.map((r) => rowToKpi(r, customColumns, customValuesByItem)));
 });
 
+// Real day-by-day figures for one KPI item (+ optional zone), across a date
+// range — used by the Analytics modal's trend chart. Unlike /common and
+// /zone/:zoneId (which SUM every entry in the range into one figure), this
+// returns each date's own row individually so the chart can plot genuine
+// history instead of a fabricated lead-in. A date nobody ever logged
+// anything for is simply absent here, not shown as zero — the chart should
+// never display a date the user didn't actually pick or enter data for.
+router.get('/history', requireAuth, async (req, res) => {
+  const { kpiItemId, fromDate, toDate } = req.query;
+  const zoneId = req.query.zoneId || null;
+  if (!kpiItemId || !fromDate || !toDate) {
+    return res.status(400).json({ error: 'kpiItemId, fromDate and toDate are required.' });
+  }
+  const zoneClause = zoneId ? 'zone_id = $4' : 'zone_id IS NULL';
+  const params = zoneId ? [kpiItemId, fromDate, toDate, zoneId] : [kpiItemId, fromDate, toDate];
+  const { rows } = await pool.query(
+    `SELECT to_char(entry_date, 'YYYY-MM-DD') AS date, target, achievement
+     FROM kpi_entries
+     WHERE kpi_item_id = $1 AND entry_date BETWEEN $2 AND $3 AND ${zoneClause} AND achievement IS NOT NULL
+     ORDER BY entry_date DESC
+     LIMIT 90`,
+    params
+  );
+  const history = rows
+    .map((r) => ({
+      date: r.date,
+      target: r.target === null ? null : Number(r.target),
+      achievement: r.achievement === null ? null : Number(r.achievement),
+    }))
+    .reverse();
+  res.json(history);
+});
+
 const VALID_UNITS = ['Nos', 'MT', 'Rs'];
 
 // Admin-only: define a brand-new KPI parameter (a new table row) that doesn't

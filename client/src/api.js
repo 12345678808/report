@@ -49,6 +49,13 @@ export const api = {
   // date is just from === to, the backend sums across the range either way.
   common: (from, to) => request(`/kpi/common?from=${from}&to=${to}`),
   zoneItems: (zoneId, from, to) => request(`/kpi/zone/${zoneId}?from=${from}&to=${to}`),
+  // Real day-by-day figures for the Analytics modal's trend chart — every
+  // date actually logged within [fromDate, toDate], nothing fabricated.
+  kpiHistory: ({ kpiItemId, zoneId, fromDate, toDate }) => {
+    const params = new URLSearchParams({ kpiItemId, fromDate, toDate });
+    if (zoneId) params.set('zoneId', zoneId);
+    return request(`/kpi/history?${params.toString()}`);
+  },
   saveEntry: (payload) => request('/kpi/entry', { method: 'PUT', body: JSON.stringify(payload) }),
   addKpiItem: (payload) => request('/kpi/items', { method: 'POST', body: JSON.stringify(payload) }),
   deleteKpiItem: (id) => request(`/kpi/items/${id}`, { method: 'DELETE' }),

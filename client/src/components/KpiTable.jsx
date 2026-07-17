@@ -222,6 +222,13 @@ export default function KpiTable({
                         performance: row.performance,
                         status: row.status,
                         note: row.note,
+                        // Needed so the modal can fetch this exact row's real
+                        // day-by-day history — same saveZoneId override a
+                        // merged-in common row uses when saving (see
+                        // commitEdit above), so the trend query looks in the
+                        // same place the figures actually live.
+                        kpiItemId: row.kpiItemId,
+                        zoneId: row.saveZoneId !== undefined ? row.saveZoneId : zoneId ?? null,
                       })
                     }
                   >

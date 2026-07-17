@@ -16,8 +16,24 @@ async function migratePublicHealthToZoneScope() {
   const { rowCount } = await pool.query(
     `UPDATE kpi_items SET scope = 'zone' WHERE department = 'PUBLIC HEALTH' AND scope = 'common'`
   );
+  // Always log the outcome (not just the "did something" branch) — this is
+  // the only way to see, from Render's deploy logs, whether a given deploy
+  // actually flipped Public Health to per-zone tracking or whether it was
+  // already done. A silent no-op here previously looked identical to "the
+  // migration step never ran at all", which made a stuck/misconfigured
+  // deploy pipeline impossible to tell apart from a normal idempotent re-run.
   if (rowCount > 0) {
     console.log(`Converted ${rowCount} Public Health kpi_items from scope='common' to scope='zone'.`);
+  } else {
+    const { rows } = await pool.query(
+      `SELECT COUNT(*) FILTER (WHERE scope = 'zone') AS zone_count, COUNT(*) AS total
+       FROM kpi_items WHERE department = 'PUBLIC HEALTH'`
+    );
+    const { zone_count: zoneCount, total } = rows[0] || {};
+    console.log(
+      `Public Health scope migration: no rows to convert (0 still scope='common'). ` +
+        `Currently ${zoneCount}/${total} Public Health kpi_items are scope='zone'.`
+    );
   }
 }
 
