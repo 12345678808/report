@@ -147,6 +147,16 @@ router.get('/zone/:zoneId', requireAuth, async (req, res) => {
   res.json(rows.map((r) => rowToKpi(r, customColumns, customValuesByItem)));
 });
 
+function mapHistoryRows(rows) {
+  return rows
+    .map((r) => ({
+      date: r.date,
+      target: r.target === null ? null : Number(r.target),
+      achievement: r.achievement === null ? null : Number(r.achievement),
+    }))
+    .reverse();
+}
+
 // Real day-by-day figures for one KPI item (+ optional zone), across a date
 // range — used by the Analytics modal's trend chart. Unlike /common and
 // /zone/:zoneId (which SUM every entry in the range into one figure), this
@@ -154,30 +164,61 @@ router.get('/zone/:zoneId', requireAuth, async (req, res) => {
 // history instead of a fabricated lead-in. A date nobody ever logged
 // anything for is simply absent here, not shown as zero — the chart should
 // never display a date the user didn't actually pick or enter data for.
+//
+// zoneId omitted means "whatever this item shows on the Overall report":
+// for a scope='common' item that's the single org-wide row (zone_id IS
+// NULL); for a scope='zone' item (e.g. Public Health, SWM, ...) the Overall
+// report shows a citywide ROLLUP summed across all 5 zones per date (see
+// buildCitywideRows on the client) — so the trend has to be built the same
+// way, one SUM(achievement) per date across every zone, or a citywide row
+// would always come back with real stats up top but an empty chart below
+// (exactly the bug this fixes: those rows never have a zone_id IS NULL
+// entry at all, only per-zone ones).
 router.get('/history', requireAuth, async (req, res) => {
   const { kpiItemId, fromDate, toDate } = req.query;
   const zoneId = req.query.zoneId || null;
   if (!kpiItemId || !fromDate || !toDate) {
     return res.status(400).json({ error: 'kpiItemId, fromDate and toDate are required.' });
   }
-  const zoneClause = zoneId ? 'zone_id = $4' : 'zone_id IS NULL';
-  const params = zoneId ? [kpiItemId, fromDate, toDate, zoneId] : [kpiItemId, fromDate, toDate];
+
+  if (zoneId) {
+    const { rows } = await pool.query(
+      `SELECT to_char(entry_date, 'YYYY-MM-DD') AS date, target, achievement
+       FROM kpi_entries
+       WHERE kpi_item_id = $1 AND entry_date BETWEEN $2 AND $3 AND zone_id = $4 AND achievement IS NOT NULL
+       ORDER BY entry_date DESC
+       LIMIT 90`,
+      [kpiItemId, fromDate, toDate, zoneId]
+    );
+    return res.json(mapHistoryRows(rows));
+  }
+
+  const { rows: itemRows } = await pool.query('SELECT scope FROM kpi_items WHERE id = $1', [kpiItemId]);
+  const scope = itemRows[0]?.scope;
+
+  if (scope === 'zone') {
+    const { rows } = await pool.query(
+      `SELECT to_char(entry_date, 'YYYY-MM-DD') AS date, SUM(target) AS target, SUM(achievement) AS achievement
+       FROM kpi_entries
+       WHERE kpi_item_id = $1 AND entry_date BETWEEN $2 AND $3 AND zone_id IS NOT NULL
+       GROUP BY entry_date
+       HAVING SUM(achievement) IS NOT NULL
+       ORDER BY entry_date DESC
+       LIMIT 90`,
+      [kpiItemId, fromDate, toDate]
+    );
+    return res.json(mapHistoryRows(rows));
+  }
+
   const { rows } = await pool.query(
     `SELECT to_char(entry_date, 'YYYY-MM-DD') AS date, target, achievement
      FROM kpi_entries
-     WHERE kpi_item_id = $1 AND entry_date BETWEEN $2 AND $3 AND ${zoneClause} AND achievement IS NOT NULL
+     WHERE kpi_item_id = $1 AND entry_date BETWEEN $2 AND $3 AND zone_id IS NULL AND achievement IS NOT NULL
      ORDER BY entry_date DESC
      LIMIT 90`,
-    params
+    [kpiItemId, fromDate, toDate]
   );
-  const history = rows
-    .map((r) => ({
-      date: r.date,
-      target: r.target === null ? null : Number(r.target),
-      achievement: r.achievement === null ? null : Number(r.achievement),
-    }))
-    .reverse();
-  res.json(history);
+  res.json(mapHistoryRows(rows));
 });
 
 const VALID_UNITS = ['Nos', 'MT', 'Rs'];
