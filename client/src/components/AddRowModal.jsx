@@ -87,7 +87,7 @@ export default function AddRowModal({ departments, onClose, onSubmit }) {
           <p className="add-row-hint">
             {scope === 'zone'
               ? "Every zone gets its own editable figure for this report, and it rolls up into the Overall report's citywide total."
-              : 'A single org-wide figure, shown in the Overall report and the "Common for all zones" block.'}
+              : 'A single city-wide figure, editable from the Overall report or any zone\'s table alike.'}
           </p>
 
           {error && <p className="login-error">{error}</p>}

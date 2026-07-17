@@ -18,6 +18,27 @@ async function request(path, options = {}) {
   return body;
 }
 
+// Same as request(), but for multipart/form-data (file upload) bodies — no
+// Content-Type header here, since the browser must set its own boundary=...
+// value on FormData requests; setting it manually breaks the upload.
+async function requestForm(path, formData) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  });
+  let body = null;
+  try {
+    body = await res.json();
+  } catch {
+    // no JSON body
+  }
+  if (!res.ok) {
+    throw new Error(body?.error || `Request failed (${res.status})`);
+  }
+  return body;
+}
+
 export const api = {
   login: (username, password, role) =>
     request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password, role }) }),
@@ -34,4 +55,15 @@ export const api = {
   getColumns: () => request('/kpi/columns'),
   addColumn: (name) => request('/kpi/columns', { method: 'POST', body: JSON.stringify({ name }) }),
   deleteColumn: (id) => request(`/kpi/columns/${id}`, { method: 'DELETE' }),
+  // Admin "Sync Data" — pulls target/achievement figures from the CCMC
+  // master-register spreadsheet (Google Sheet tab, or an uploaded .xlsx of
+  // the same shape) into the app, matched by Department + Report name.
+  syncGoogleSheet: ({ tabName, date, sheetUrl }) =>
+    request('/admin/sync/google-sheet', { method: 'POST', body: JSON.stringify({ tabName, date, sheetUrl }) }),
+  syncExcel: (file, date) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('date', date);
+    return requestForm('/admin/sync/excel', form);
+  },
 };

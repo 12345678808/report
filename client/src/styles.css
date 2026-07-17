@@ -227,6 +227,26 @@ body.force-letterhead .print-letterhead-wrap{ display:block; }
 .excel-btn{ padding:9px 16px;border:1px solid var(--green);background:#fff;color:var(--green);font-weight:bold;font-size:12.5px;border-radius:8px;cursor:pointer;white-space:nowrap;transition:background 0.15s,color 0.15s; }
 .excel-btn:hover{ background:var(--green);color:#fff; }
 .excel-btn:disabled{ opacity:0.6;cursor:default; }
+.sync-data-btn{ padding:9px 16px;border:1px solid var(--steel);background:#fff;color:var(--steel);font-weight:bold;font-size:12.5px;border-radius:8px;cursor:pointer;white-space:nowrap;transition:background 0.15s,color 0.15s; }
+.sync-data-btn:hover{ background:var(--steel);color:#fff; }
+
+/* ---------- Sync Data modal (admin: pull figures from the master-register
+   Google Sheet or an uploaded .xlsx of the same shape) ---------- */
+.sync-data-card{ max-width:480px; }
+.sync-mode-toggle{ display:flex;gap:8px;margin-top:10px; }
+.sync-mode-toggle button{ flex:1;padding:9px 10px;border:1px solid var(--sky-line);background:#fff;color:var(--steel);font-size:12.5px;font-weight:bold;border-radius:8px;cursor:pointer;transition:background 0.15s,color 0.15s; }
+.sync-mode-toggle button:hover{ background:var(--gold-light); }
+.sync-mode-toggle button.active{ background:linear-gradient(180deg,var(--steel),var(--navy));border-color:var(--navy);color:#fff; }
+.sync-form{ display:flex;flex-direction:column;margin-top:14px; }
+.sync-form label{ font-size:11px;text-transform:uppercase;letter-spacing:0.4px;color:var(--ink-soft);margin:12px 0 4px; }
+.sync-form label:first-child{ margin-top:0; }
+.sync-form input{ width:100%;padding:10px 12px;border:1px solid var(--sky-line);border-radius:8px;background:var(--sky);font-size:14px;box-sizing:border-box; }
+.sync-result{ margin-top:12px;padding:10px 12px;border:1px solid var(--sky-line);border-radius:8px;background:var(--sky);font-size:12.5px;line-height:1.5; }
+.sync-result p{ margin:0 0 6px; }
+.sync-result p:last-child{ margin-bottom:0; }
+.sync-result-warn{ color:#9C7A28;font-weight:bold; }
+.sync-result-list{ margin:0;padding-left:18px;color:var(--ink-soft); }
+.sync-hint{ font-size:11px;color:var(--ink-soft);margin:16px 0 0;line-height:1.5;padding-top:12px;border-top:1px solid var(--sky-line); }
 
 /* ---------- Export Options modal (section picker shown before a PDF/Excel
    download) — reuses .modal-overlay/.modal-card/.modal-head/.modal-dept/

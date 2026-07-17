@@ -192,9 +192,14 @@ export default function AnalyticsModal({ info, fromDateIso, toDateIso, onClose }
     toDate = toDateIso;
   }
 
-  const target = Number(info.target);
+  // Target is now optional here too — a KPI with no target still has a
+  // meaningful achievement figure (shown as achievement% per the no-target
+  // rule elsewhere), so the chart should render off achievement alone rather
+  // than requiring both. AnalyticsChart already treats target<=0 as "no
+  // target line" internally (see hasTarget there).
+  const target = info.target !== null && info.target !== undefined ? Number(info.target) : 0;
   const achievement = Number(info.achievement);
-  const hasNumbers = info.target !== null && info.target !== undefined && info.achievement !== null && info.achievement !== undefined;
+  const hasNumbers = info.achievement !== null && info.achievement !== undefined;
   const tier = tierFromStatus(info.status);
   const accentColor = tier ? tierPastelColor(tier) : 'var(--sky-line)';
 

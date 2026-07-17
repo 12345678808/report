@@ -7,6 +7,7 @@ import PrintLetterhead from './PrintLetterhead';
 import AnalyticsModal from './AnalyticsModal';
 import AddRowModal from './AddRowModal';
 import AddColumnModal from './AddColumnModal';
+import SyncDataModal from './SyncDataModal';
 import ExportOptionsModal from './ExportOptionsModal';
 import DepartmentSummaryTable from './DepartmentSummaryTable';
 import Navbar from './Navbar';
@@ -67,6 +68,7 @@ export default function Dashboard({ user, onLoggedOut }) {
   const [analyticsInfo, setAnalyticsInfo] = useState(null);
   const [showAddRow, setShowAddRow] = useState(false);
   const [showAddColumn, setShowAddColumn] = useState(false);
+  const [showSyncData, setShowSyncData] = useState(false);
 
   // Clicking "Download Report" opens a section-picker instead of exporting
   // immediately — exportModalFormat is 'pdf' | 'excel' | null (which format's
@@ -220,13 +222,16 @@ export default function Dashboard({ user, onLoggedOut }) {
     });
   }
 
-  // The Zone report tab's per-zone table now has Public Health (a common,
-  // org-wide row) merged in alongside that zone's own rows (see
-  // commonRowsForZoneTable/displayZoneRows). Editing a Public Health row from
-  // there must still save as a common entry (zoneId null, via
-  // row.saveZoneId — see KpiTable's commitEdit), landing in commonRows, not
-  // zoneRowsById. This router picks the right save+local-state-update path
-  // based on the zoneId the edit actually comes in with.
+  // The Zone report tab's per-zone table merges in any city-wide/common-scope
+  // items alongside that zone's own rows (see commonRowsForZoneTable/
+  // displayZoneRows) — Public Health used to be one of these before it moved
+  // to genuine per-zone tracking, but an admin can still add a new common
+  // (city-wide) item via Add Row, and this is what makes that show up and
+  // stay editable directly from every zone's table. Editing such a row must
+  // still save as a common entry (zoneId null, via row.saveZoneId — see
+  // KpiTable's commitEdit), landing in commonRows, not zoneRowsById. This
+  // router picks the right save+local-state-update path based on the zoneId
+  // the edit actually comes in with.
   async function handleSaveZoneOrCommon(payload) {
     if (payload.zoneId === null) {
       await handleSaveCommon(payload);
@@ -395,10 +400,10 @@ export default function Dashboard({ user, onLoggedOut }) {
   }
 
   // Builds an .xlsx workbook with one sheet per selected section (Overall,
-  // each selected zone individually — with Public Health merged in, since
-  // there's no separate "Common" section anymore — and/or a Department-wise
-  // Summary sheet) — replaces the old single-sheet-of-whatever's-on-screen
-  // export now that sections are picked explicitly.
+  // each selected zone individually — with any city-wide/common items merged
+  // in, since there's no separate "Common" section anymore — and/or a
+  // Department-wise Summary sheet) — replaces the old single-sheet-of-
+  // whatever's-on-screen export now that sections are picked explicitly.
   function handleDownloadExcelSections(selection) {
     if (isExportingExcel) return;
     setError('');
@@ -471,16 +476,15 @@ export default function Dashboard({ user, onLoggedOut }) {
   const canEditValues = canEdit && !isRange;
   const activeZone = zones.find((z) => z.id === activeZoneId);
   const activeZoneRows = activeZoneId != null ? zoneRowsById[activeZoneId] || [] : [];
-  // Public Health (commonRows) isn't tracked per-zone in the data model — the
-  // same org-wide figure applies to every zone. Per explicit request ("public
-  // health um zone ku kila kondu vandhu, common-na edhume venda" — bring
-  // Public Health under the zone tables too, no separate "Common" section),
-  // it's no longer shown as its own block above the zone chips; instead it's
-  // merged straight into each zone's own table. It stays genuinely editable
-  // there too (not just a read-only display) — saveZoneId:null tells
-  // KpiTable's commitEdit to save it as a common entry regardless of which
-  // zone's table it's shown in, and handleSaveZoneOrCommon (below) routes the
-  // save to the right local state (commonRows vs zoneRowsById) accordingly.
+  // Public Health used to live here (as a common/org-wide row merged into
+  // every zone's table) before it moved to genuine per-zone tracking — see
+  // the Public Health sync feature and migrate.js. commonRows is usually
+  // empty now, but any city-wide item an admin adds via Add Row still shows
+  // up merged into every zone's table this way, genuinely editable in place:
+  // saveZoneId:null tells KpiTable's commitEdit to save it as a common entry
+  // regardless of which zone's table it's shown in, and handleSaveZoneOrCommon
+  // (above) routes the save to the right local state (commonRows vs
+  // zoneRowsById) accordingly.
   const commonRowsForZoneTable = commonRows.map((r) => ({ ...r, saveZoneId: null }));
   const displayZoneRows = [...commonRowsForZoneTable, ...activeZoneRows];
   // All 32+ KPIs for the Overall report: the real common (citywide) rows,
@@ -545,6 +549,11 @@ export default function Dashboard({ user, onLoggedOut }) {
             {canEdit && (
               <button type="button" className="add-col-btn" onClick={() => setShowAddColumn(true)}>
                 + Add Column
+              </button>
+            )}
+            {canEdit && (
+              <button type="button" className="sync-data-btn" onClick={() => setShowSyncData(true)}>
+                Sync Data
               </button>
             )}
             <button type="button" className="pdf-btn" onClick={() => setExportModalFormat('pdf')} disabled={isExportingPdf}>
@@ -742,6 +751,17 @@ export default function Dashboard({ user, onLoggedOut }) {
         <AddRowModal departments={departmentNames} onClose={() => setShowAddRow(false)} onSubmit={handleAddRow} />
       )}
       {showAddColumn && <AddColumnModal onClose={() => setShowAddColumn(false)} onSubmit={handleAddColumn} />}
+      {showSyncData && (
+        <SyncDataModal
+          onClose={() => setShowSyncData(false)}
+          onSynced={async () => {
+            // Refresh whatever's currently on screen — harmless if the
+            // synced date differs from the one being viewed right now.
+            await loadCommon(fromDate, toDate);
+            if (zones.length) await loadZoneRows(fromDate, toDate, zones);
+          }}
+        />
+      )}
     </div>
   );
 }
